@@ -12,7 +12,7 @@
 *.log
 output.json
 *.env
-
+**/google-services.json
 # Kotlin
 *.class
 *.jar

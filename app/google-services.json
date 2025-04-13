@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "105969914439",
+    "project_id": "wordboost-57c45",
+    "storage_bucket": "wordboost-57c45.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:105969914439:android:d5958f13954d383ca71762",
+        "android_client_info": {
+          "package_name": "com.example.wordboost"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD87IpbDtHF-1DHdUi0eo2IDtVoBwx2Y0w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
