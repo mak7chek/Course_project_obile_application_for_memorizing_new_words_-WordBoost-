@@ -4,58 +4,43 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.tooling.preview.Preview
-
-@Preview
+import androidx.compose.ui.unit.dp
+import com.example.wordboost.translation.*
+import com.example.wordboost.data.firebase.FirebaseRepository
+@Preview( showBackground =  true)
 @Composable
 fun TranslateScreen() {
-    var input by remember { mutableStateOf(TextFieldValue("")) }
-
+    var input by remember { mutableStateOf("") }
     var translation by remember { mutableStateOf("") }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Top,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Переклад слів",
-            style = MaterialTheme.typography.headlineSmall
-        )
+    // Створюємо залежності для ProxyTranslator:
+    // Реальний перекладач. Якщо потрібен API-ключ, додай його в конструктор або налаштування.
+    val realTranslator = remember { RealTranslator() }
+    // Інстанція репозиторію для роботи з Firebase
+    val repository = remember { FirebaseRepository() }
+    // ProxyTranslator отримує залежності
+    val proxy = remember { ProxyTranslator(realTranslator, repository) }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
+    Column(modifier = Modifier.padding(16.dp)) {
+        TextField(
             value = input,
             onValueChange = { input = it },
             label = { Text("Введіть слово") },
             modifier = Modifier.fillMaxWidth()
         )
-        OutlinedTextField(
-
-            label = { Text("Переклад слова") },
-            modifiler = Modifier.fillMaxSize()
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(onClick = {
-            translation = "Перекладене слово: ${input.text} (псевдо)"
-        }) {
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(
+            onClick = {
+                proxy.translate(input, "EN") { translated ->
+                    translation = translated ?: "Немає перекладу"
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Text("Перекласти")
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        if (translation.isNotEmpty()) {
-            Text(
-                text = translation,
-                style = MaterialTheme.typography.bodyLarge
-            )
-        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(text = "Переклад: $translation")
     }
 }
