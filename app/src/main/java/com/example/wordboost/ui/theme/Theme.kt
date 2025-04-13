@@ -1,6 +1,5 @@
-package com.example.course_project_obile_application_for_memorizing_new_words_wordboost.ui.theme
+package com.example.wordboost.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme

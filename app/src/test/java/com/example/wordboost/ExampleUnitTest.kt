@@ -1,4 +1,4 @@
-package com.example.course_project_obile_application_for_memorizing_new_words_wordboost
+package com.example.wordboost
 
 import org.junit.Test
 

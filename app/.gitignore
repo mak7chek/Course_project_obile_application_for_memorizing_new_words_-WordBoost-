@@ -1,1 +1,15 @@
-/build
+# Android Studio
+.idea/
+.gradle/
+local.properties
+*.iml
+*.apk
+*.ap_
+build/
+captures/
+output.json
+
+# Env files
+.env
+*.env
+.env.*

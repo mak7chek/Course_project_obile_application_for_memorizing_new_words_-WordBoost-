@@ -1,4 +1,4 @@
-package com.example.course_project_obile_application_for_memorizing_new_words_wordboost.ui.theme
+package com.example.wordboost.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
