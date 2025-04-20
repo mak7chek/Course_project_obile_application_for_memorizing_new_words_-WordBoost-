@@ -4,7 +4,6 @@ import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 
-// Якщо ще не створено, можна створити окремий інтерфейс Translator:
 interface Translator {
     fun translate(text: String, targetLang: String, callback: (String?) -> Unit)
 }

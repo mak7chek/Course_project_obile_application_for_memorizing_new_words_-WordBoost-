@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.gms.google-services") version "4.4.2" apply false
+    id("kotlin-kapt")
 
 }
 
@@ -60,6 +61,10 @@ android {
 }
 
 dependencies {
+
+    implementation("androidx.room:room-runtime:2.6.1")
+    kapt("androidx.room:room-compiler:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
     implementation(platform("com.google.firebase:firebase-bom:33.12.0"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -78,6 +83,7 @@ dependencies {
     implementation(libs.firebase.common.ktx)
 
     implementation(libs.firebase.firestore.ktx)
+    implementation(libs.androidx.room.common.jvm)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -87,3 +93,4 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
 
 }
+apply(plugin = "com.google.gms.google-services")
