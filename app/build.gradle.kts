@@ -63,6 +63,7 @@ android {
 dependencies {
 
     implementation("androidx.room:room-runtime:2.6.1")
+    implementation(libs.androidx.media3.common.ktx)
     kapt("androidx.room:room-compiler:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     implementation(platform("com.google.firebase:firebase-bom:33.12.0"))

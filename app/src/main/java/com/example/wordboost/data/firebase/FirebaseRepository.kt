@@ -3,12 +3,16 @@ package com.example.wordboost.data.firebase
 
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.example.wordboost.data.model.Word
+import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.ktx.firestore
 
 class FirebaseRepository {
 
     private val db = Firebase.firestore
     private val wordsCollection = db.collection("words")
     private val groupsCollection = db.collection("groups")
+
 
     fun getTranslation(text: String, callback: (String?) -> Unit) {
         wordsCollection.whereEqualTo("original", text)
@@ -21,6 +25,13 @@ class FirebaseRepository {
             .addOnFailureListener {
                 callback(null)
             }
+    }
+
+    fun saveWord(word: Word, callback: (Boolean) -> Unit = {}) {
+        wordsCollection.document(word.id)
+            .set(word, SetOptions.merge())
+            .addOnSuccessListener { callback(true) }
+            .addOnFailureListener { callback(false) }
     }
 
     fun saveTranslation(text: String, translated: String, groupId: String? = null) {
@@ -69,6 +80,20 @@ class FirebaseRepository {
         groupsCollection.document(groupId).delete()
             .addOnSuccessListener { callback(true) }
             .addOnFailureListener { callback(false) }
+    }
+
+    fun getWordObject(text: String, callback: (Word?) -> Unit) {
+        wordsCollection
+            .whereEqualTo("text", text)
+            .limit(1)
+            .get()
+            .addOnSuccessListener { docs ->
+                val word = docs.firstOrNull()?.toObject(Word::class.java)
+                callback(word)
+            }
+            .addOnFailureListener {
+                callback(null)
+            }
     }
 }
 
