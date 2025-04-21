@@ -8,5 +8,6 @@ data class Word(
     val knowledgeLevel: Int = 0,
     val status: String = "new",
     val lastReviewed: Long = 0L,
-    val nextReview: Long = 0L
+    val nextReview: Long = 0L,
+    val userId: String = ""
 )

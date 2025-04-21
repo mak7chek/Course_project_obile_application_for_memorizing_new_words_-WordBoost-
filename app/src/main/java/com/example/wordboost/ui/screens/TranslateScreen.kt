@@ -125,7 +125,8 @@ fun TranslateScreen() {
                                         knowledgeLevel = 0,
                                         status = "new",
                                         lastReviewed = 0L,
-                                        nextReview = 0L
+                                        nextReview = 0L,
+                                        userId = "testUser"
                                     )
                                     firebaseRepo.saveWord(word) { success ->
                                         statusMessage = if (success) "Додано до словника" else "Помилка збереження"
@@ -174,7 +175,7 @@ fun TranslateScreen() {
                                 }
                             } else {
                                 val id = UUID.nameUUIDFromBytes((original + translated + groupId).toByteArray()).toString()
-                                val newWord = Word(id, original, translated, groupId, 0, "new", 0L, 0L)
+                                val newWord = Word(id, original, translated, groupId, 0, "new", 0L, 0L,userId = "testUser")
                                 firebaseRepo.saveWord(newWord) { success ->
                                     statusMessage = if (success) "Додано до групи" else "Помилка збереження"
                                 }

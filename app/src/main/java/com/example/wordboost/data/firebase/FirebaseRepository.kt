@@ -3,7 +3,8 @@ package com.example.wordboost.data.firebase
 
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
-import com.example.wordboost.data.model.Word
+import com.example.wordboost.data.model.*
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
 
@@ -13,7 +14,55 @@ class FirebaseRepository {
     private val wordsCollection = db.collection("words")
     private val groupsCollection = db.collection("groups")
 
+    fun getUserWordsForPractice(callback: (List<Word>) -> Unit) {
+       val userId = "testUser"// FirebaseAuth.getInstance().currentUser?.uid ?: return callback(emptyList())
 
+        db.collection("words")
+            .whereEqualTo("userId", userId)
+            .get()
+            .addOnSuccessListener { result ->
+                val words = result.documents.mapNotNull { it.toObject(Word::class.java) }
+                    .filter { it.status != "learned" && it.nextReview <= System.currentTimeMillis() }
+                callback(words)
+            }
+            .addOnFailureListener {
+                callback(emptyList())
+            }
+    }
+    fun updateWordProgress(oldWord:Word,correct:Boolean,callback: (Boolean) -> Unit ){
+        val newLevel= (oldWord.knowledgeLevel + if (correct) 20 else -10)
+            .coerceIn(0,100)
+        val now = System.currentTimeMillis()
+        val next = PracticeUtils.calculateNextReviewTime(newLevel)
+        val updated=oldWord.copy(
+            knowledgeLevel = newLevel,
+            lastReviewed = now,
+            nextReview = next,
+            status = when{
+                newLevel >=80 -> "mastered"
+                newLevel >=20 -> "review"
+                else -> "learning"
+            }
+        )
+        wordsCollection.document(updated.id)
+            .set(updated, SetOptions.merge())
+            .addOnSuccessListener { callback(true) }
+            .addOnFailureListener{callback(false)}
+
+    }
+    fun getWordObject(text: String, callback: (Word?) -> Unit) {
+        wordsCollection
+            .whereEqualTo("text", text)
+            .limit(1)
+            .get()
+            .addOnSuccessListener { docs ->
+                val word = docs.firstOrNull()?.toObject(Word::class.java)
+                callback(word)
+            }
+            .addOnFailureListener {
+                callback(null)
+            }
+    }
     fun getTranslation(text: String, callback: (String?) -> Unit) {
         wordsCollection.whereEqualTo("original", text)
             .limit(1)
@@ -82,19 +131,7 @@ class FirebaseRepository {
             .addOnFailureListener { callback(false) }
     }
 
-    fun getWordObject(text: String, callback: (Word?) -> Unit) {
-        wordsCollection
-            .whereEqualTo("text", text)
-            .limit(1)
-            .get()
-            .addOnSuccessListener { docs ->
-                val word = docs.firstOrNull()?.toObject(Word::class.java)
-                callback(word)
-            }
-            .addOnFailureListener {
-                callback(null)
-            }
-    }
+
 }
 
 data class Group(

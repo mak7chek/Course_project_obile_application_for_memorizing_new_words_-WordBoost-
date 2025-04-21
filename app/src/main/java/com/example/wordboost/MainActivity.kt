@@ -19,8 +19,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.wordboost.ui.theme.Course_project_obile_application_for_memorizing_new_words_WordBoostTheme
 import com.google.firebase.FirebaseApp
-
-import com.example.wordboost.ui.screens.TranslateScreen
+import com.example.wordboost.data.firebase.FirebaseRepository
+import com.example.wordboost.data.repository.PracticeRepository
+import com.example.wordboost.ui.screens.*
 
 
 class MainActivity : ComponentActivity() {
@@ -28,47 +29,56 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         FirebaseApp.initializeApp(this)
 
+        val firebaseRepo = FirebaseRepository()
+        val practiceRepo = PracticeRepository(firebaseRepo)
 
         setContent {
             Course_project_obile_application_for_memorizing_new_words_WordBoostTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    MainScreen()
+                    MainScreen(practiceRepo = practiceRepo)
                 }
             }
         }
     }
 }
 @Composable
-fun MainScreen() {
+fun MainScreen(practiceRepo: PracticeRepository) {
     var showTranslateScreen by remember { mutableStateOf(false) }
+    var showPracticeScreen by remember { mutableStateOf(false) }
 
-    if (showTranslateScreen) {
-        TranslateScreen()
-    } else {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text("Привіт у WordBoost!", style = MaterialTheme.typography.headlineMedium)
+    when {
+        showTranslateScreen -> {
+            TranslateScreen()
+        }
+        showPracticeScreen -> {
+            PracticeScreen(practiceRepo = practiceRepo)
+        }
+        else -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text("Привіт у WordBoost!", style = MaterialTheme.typography.headlineMedium)
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-            Button(onClick = { showTranslateScreen = true }) {
-                Text("Перекласти слово")
-            }
+                Button(onClick = { showTranslateScreen = true }) {
+                    Text("Перекласти слово")
+                }
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-            Button(onClick = { /* TODO: словник */ }) {
-                Text("Мій словник")
-            }
+                Button(onClick = { /* TODO: словник */ }) {
+                    Text("Мій словник")
+                }
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-            Button(onClick = { /* TODO: практика */ }) {
-                Text("Практика")
+                Button(onClick = { showPracticeScreen = true }) {
+                    Text("Практика")
+                }
             }
         }
     }
