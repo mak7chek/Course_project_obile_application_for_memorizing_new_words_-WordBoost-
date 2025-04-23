@@ -1,55 +1,44 @@
 package com.example.wordboost.data.firebase
 
-
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
-import com.example.wordboost.data.model.*
-import com.google.firebase.auth.FirebaseAuth
+import com.example.wordboost.data.model.Word
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
+import com.google.firebase.auth.FirebaseAuth
 
+/**
+ * Репозиторій для роботи зі словами у Firestore
+ */
 class FirebaseRepository {
 
     private val db = Firebase.firestore
     private val wordsCollection = db.collection("words")
     private val groupsCollection = db.collection("groups")
 
+    /**
+     * Отримати слова для практики (nextReview <= зараз, статус != "mastered")
+     */
     fun getUserWordsForPractice(callback: (List<Word>) -> Unit) {
-       val userId = "testUser"// FirebaseAuth.getInstance().currentUser?.uid ?: return callback(emptyList())
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "testUser"
+        val now = System.currentTimeMillis()
 
-        db.collection("words")
-            .whereEqualTo("userId", userId)
+        wordsCollection
+            .whereEqualTo("userId", "testUser")
+//            .whereLessThanOrEqualTo("nextReview", now)
             .get()
             .addOnSuccessListener { result ->
                 val words = result.documents.mapNotNull { it.toObject(Word::class.java) }
-                    .filter { it.status != "learned" && it.nextReview <= System.currentTimeMillis() }
+                    .filter { it.status != "mastered" }
                 callback(words)
             }
             .addOnFailureListener {
                 callback(emptyList())
             }
     }
-    fun updateWordProgress(oldWord:Word,correct:Boolean,callback: (Boolean) -> Unit ){
-        val newLevel= (oldWord.knowledgeLevel + if (correct) 20 else -10)
-            .coerceIn(0,100)
-        val now = System.currentTimeMillis()
-        val next = PracticeUtils.calculateNextReviewTime(newLevel)
-        val updated=oldWord.copy(
-            knowledgeLevel = newLevel,
-            lastReviewed = now,
-            nextReview = next,
-            status = when{
-                newLevel >=80 -> "mastered"
-                newLevel >=20 -> "review"
-                else -> "learning"
-            }
-        )
-        wordsCollection.document(updated.id)
-            .set(updated, SetOptions.merge())
-            .addOnSuccessListener { callback(true) }
-            .addOnFailureListener{callback(false)}
 
-    }
+    /**
+     * Отримати Word за текстом
+     */
     fun getWordObject(text: String, callback: (Word?) -> Unit) {
         wordsCollection
             .whereEqualTo("text", text)
@@ -63,19 +52,19 @@ class FirebaseRepository {
                 callback(null)
             }
     }
+
+    /**
+     * Отримати переклад для тексту (через Word.translation)
+     */
     fun getTranslation(text: String, callback: (String?) -> Unit) {
-        wordsCollection.whereEqualTo("original", text)
-            .limit(1)
-            .get()
-            .addOnSuccessListener { docs ->
-                val translated = docs.firstOrNull()?.getString("translated")
-                callback(translated)
-            }
-            .addOnFailureListener {
-                callback(null)
-            }
+        getWordObject(text) { word ->
+            callback(word?.translation)
+        }
     }
 
+    /**
+     * Зберегти або оновити Word у Firestore
+     */
     fun saveWord(word: Word, callback: (Boolean) -> Unit = {}) {
         wordsCollection.document(word.id)
             .set(word, SetOptions.merge())
@@ -83,21 +72,12 @@ class FirebaseRepository {
             .addOnFailureListener { callback(false) }
     }
 
-    fun saveTranslation(text: String, translated: String, groupId: String? = null) {
-        val data = mutableMapOf<String, Any>(
-            "original" to text,
-            "translated" to translated,
-            "timestamp" to System.currentTimeMillis()
-        )
-        groupId?.let {
-            data["groupId"] = it
-        }
-
-        wordsCollection.add(data)
-    }
-
+    /**
+     * Отримати усі групи
+     */
     fun getGroups(callback: (List<Group>) -> Unit) {
-        groupsCollection.get()
+        groupsCollection
+            .get()
             .addOnSuccessListener { result ->
                 val groups = result.mapNotNull { doc ->
                     val id = doc.id
@@ -111,13 +91,20 @@ class FirebaseRepository {
             }
     }
 
+    /**
+     * Створити нову групу
+     */
     fun createGroup(name: String, callback: (Boolean) -> Unit) {
         val group = mapOf("name" to name)
-        groupsCollection.add(group)
+        groupsCollection
+            .add(group)
             .addOnSuccessListener { callback(true) }
             .addOnFailureListener { callback(false) }
     }
 
+    /**
+     * Оновити назву групи
+     */
     fun updateGroup(groupId: String, newName: String, callback: (Boolean) -> Unit) {
         groupsCollection.document(groupId)
             .update("name", newName)
@@ -125,16 +112,21 @@ class FirebaseRepository {
             .addOnFailureListener { callback(false) }
     }
 
+    /**
+     * Видалити групу
+     */
     fun deleteGroup(groupId: String, callback: (Boolean) -> Unit) {
-        groupsCollection.document(groupId).delete()
+        groupsCollection.document(groupId)
+            .delete()
             .addOnSuccessListener { callback(true) }
             .addOnFailureListener { callback(false) }
     }
-
-
 }
 
+/**
+ * Модель групи
+ */
 data class Group(
-    val id: String,
-    val name: String
+    val id: String = "",
+    val name: String = ""
 )

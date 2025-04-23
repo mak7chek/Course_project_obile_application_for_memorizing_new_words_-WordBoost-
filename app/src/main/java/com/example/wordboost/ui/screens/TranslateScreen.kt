@@ -14,7 +14,7 @@ import com.example.wordboost.data.local.AppDatabase
 import com.example.wordboost.data.model.Word
 import com.example.wordboost.data.repository.TranslationRepository
 import com.example.wordboost.translation.RealTranslator
-import com.example.wordboost.ui.components.GroupSelectorDialog
+import com.example.wordboost.ui.components.CustomGroupDialog
 import com.example.wordboost.data.firebase.Group
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.room.Room
@@ -35,7 +35,7 @@ fun TranslateScreen() {
     val firebaseRepo    = remember { FirebaseRepository() }
     val realTranslator  = remember { RealTranslator() }
     val translationRepo = remember { TranslationRepository(firebaseRepo, cacheDao, realTranslator) }
-    val scope = rememberCoroutineScope()
+
 
     // Input fields
     var ukText by remember { mutableStateOf("") }
@@ -104,41 +104,53 @@ fun TranslateScreen() {
             statusMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
 
             // Save buttons row - only when both fields have text
-            if (ukText.isNotBlank() && enText.isNotBlank()) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Add to dictionary
-                    Button(
-                        onClick = {
-                            statusMessage = null
-                            val original = ukText
-                            val translated = enText
-                            firebaseRepo.getTranslation(original) { existing ->
-                                if (existing != null) {
-                                    statusMessage = "Слово вже в словнику"
-                                } else {
-                                    val id = UUID.nameUUIDFromBytes((original + translated).toByteArray()).toString()
-                                    val word = Word(
-                                        id = id,
-                                        text = original,
-                                        translation = translated,
-                                        dictionaryId = "",
-                                        knowledgeLevel = 0,
-                                        status = "new",
-                                        lastReviewed = 0L,
-                                        nextReview = 0L,
-                                        userId = "testUser"
-                                    )
-                                    firebaseRepo.saveWord(word) { success ->
-                                        statusMessage = if (success) "Додано до словника" else "Помилка збереження"
-                                    }
+            // Кнопки збереження/додавання до групи - завжди присутні в компонуванні,
+            // але їх активність контролюється умовою
+            val canSave = ukText.isNotBlank() && enText.isNotBlank() // Умова активності кнопок
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Додати в словник
+                Button(
+                    onClick = {
+                        // ... ваша логіка збереження в словник ...
+                        // Скопіюйте сюди всю логіку, яка була всередині onClick цієї кнопки
+                        statusMessage = null
+                        val original = ukText.trim()
+                        val translated = enText.trim() // Отримати переклад тут
+
+                        firebaseRepo.getWordObject(original) { existingWord ->
+                            if (existingWord != null) {
+                                statusMessage = "Слово вже в словнику"
+                            } else {
+                                val id = UUID.nameUUIDFromBytes((original + translated).toByteArray()).toString()
+                                val word = Word(
+                                    userId = "testUser", // ПЕРЕВІРТЕ userId
+                                    id = id,
+                                    text = original,
+                                    translation = translated,
+                                    dictionaryId = "", // Для словника dictionaryId пустий
+                                    repetition = 0, easiness = 2.5f, interval = 0L, lastReviewed = 0L, nextReview = 0L, status = "new"
+                                )
+                                firebaseRepo.saveWord(word) { success ->
+                                    statusMessage = if (success) "Додано до словника" else "Помилка збереження"
                                 }
                             }
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Додати в словник")
-                    }
-
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = canSave // <-- Кнопка активна, тільки коли обидва поля заповнені
+                ) {
+                    Text("Додати в словник")
+                }
+                // Додати до групи
+                Button(
+                    onClick = { showGroupDialog = true },
+                    modifier = Modifier.weight(1f),
+                    enabled = canSave // <-- Кнопка активна, тільки коли обидва поля заповнені
+                ) {
+                    Text("Додати до групи")
+                }
+            }
                     // Add to group
                     Button(
                         onClick = { showGroupDialog = true },
@@ -151,42 +163,90 @@ fun TranslateScreen() {
 
             // Group selector dialog
             if (showGroupDialog) {
-                GroupSelectorDialog(
+                CustomGroupDialog( // Використовуємо ваш новий компонент
                     groups = groups,
                     selectedGroupId = selectedGroupId,
                     onGroupSelected = { selectedGroupId = it },
                     onCreateGroup = { name ->
-                        firebaseRepo.createGroup(name) { success -> if (success) firebaseRepo.getGroups { groups = it } }
+                        // Логіка створення групи. Переконайтесь, що getGroups викликається після успіху
+                        firebaseRepo.createGroup(name) { success ->
+                            if (success) {
+                                firebaseRepo.getGroups { fetchedGroups ->
+                                    groups = fetchedGroups
+                                    // Можливо, тут варто знайти нову групу і встановити selectedGroupId = it.id?
+                                    // Це залежить від того, чи getGroups повертає ID нової групи,
+                                    // або вам потрібен інший метод для отримання ID після створення.
+                                }
+                                statusMessage = "Група '${name}' створена" // Опціонально: повідомлення про створення
+                            } else {
+                                statusMessage = "Помилка створення групи '${name}'" // Повідомлення про помилку
+                            }
+                        }
                     },
-                    onConfirm = {
-                        statusMessage = null
-                        val original = ukText
-                        val translated = enText
+                    onConfirm = { // ВИПРАВЛЕНА ЛЯМБДА ONCONFIRM
+                        statusMessage = null // Очищаємо попередній статус
+                        val original = ukText.trim() // Забираємо зайві пробіли
+                        val translated = enText.trim() // Забираємо зайві пробіли
                         val groupId = selectedGroupId.orEmpty()
-                        firebaseRepo.getTranslation(original) { existing ->
-                            if (existing != null) {
-                                firebaseRepo.getWordObject(original) { wordObj ->
-                                    wordObj?.let { existingWord ->
-                                        val updated = existingWord.copy(dictionaryId = groupId)
-                                        firebaseRepo.saveWord(updated) { success ->
-                                            statusMessage = if (success) "Група оновлена" else "Помилка оновлення"
-                                        }
-                                    }
+
+                        // Валідація: перевірка, чи обрана група
+                        if (groupId.isBlank()) {
+                            statusMessage = "Будь ласка, оберіть групу або створіть нову."
+                            // Не закриваємо діалог, щоб користувач міг обрати/створити групу
+                            return@CustomGroupDialog // Виходимо з цієї лямбди
+                        }
+
+                        // Валідація: перевірка, чи є текст
+                        if (original.isBlank() || translated.isBlank()) {
+                            statusMessage = "Поля 'Українське слово' та 'English word' мають бути заповнені."
+                            // Не закриваємо діалог
+                            return@CustomGroupDialog // Виходимо з цієї лямбди
+                        }
+
+
+                        // Правильна логіка: шукаємо об'єкт слова за оригінальним текстом
+                        firebaseRepo.getWordObject(original) { wordObj ->
+                            if (wordObj != null) {
+                                // Слово ЗНАЙДЕНО, оновлюємо лише його групу (dictionaryId)
+                                val updated = wordObj.copy(dictionaryId = groupId)
+                                firebaseRepo.saveWord(updated) { success ->
+                                    statusMessage = if (success) "Група слова оновлена" else "Помилка оновлення групи"
+                                    // ТЕПЕР закриваємо діалог після завершення операції збереження
+                                    showGroupDialog = false
+                                    selectedGroupId = null // Скидаємо обрану групу
                                 }
                             } else {
+                                // Слово НЕ ЗНАЙДЕНО, створюємо НОВЕ слово з вказаною групою
                                 val id = UUID.nameUUIDFromBytes((original + translated + groupId).toByteArray()).toString()
-                                val newWord = Word(id, original, translated, groupId, 0, "new", 0L, 0L,userId = "testUser")
+                                val newWord = Word(
+                                    userId = "testUser", // ПЕРЕВІРТЕ, ЩО ВИКОРИСТОВУЄТЬСЯ ПРАВИЛЬНИЙ ID КОРИСТУВАЧА
+                                    id = id,
+                                    text = original,
+                                    translation = translated,
+                                    dictionaryId = groupId, // Вказуємо обрану групу
+                                    repetition = 0,
+                                    easiness = 2.5f,
+                                    interval = 0L,
+                                    lastReviewed = 0L,
+                                    nextReview = 0L,
+                                    status = "new" // Нове слово має статус "new"
+                                )
                                 firebaseRepo.saveWord(newWord) { success ->
-                                    statusMessage = if (success) "Додано до групи" else "Помилка збереження"
+                                    statusMessage = if (success) "Слово додано до групи" else "Помилка збереження слова в групу"
+                                    // ТЕПЕР закриваємо діалог після завершення операції збереження
+                                    showGroupDialog = false
+                                    selectedGroupId = null // Скидаємо обрану групу
                                 }
                             }
                         }
-                        showGroupDialog = false
-                        selectedGroupId = null
+                        // !!! ВИДАЛИТИ ЦІ РЯДКИ ЗВІДСИ !!! Вони закривали діалог передчасно.
+                        // showGroupDialog = false
+                        // selectedGroupId = null
                     },
-                    onDismissRequest = { showGroupDialog = false; selectedGroupId = null }
-                )
-            }
-        }
-    }
+                    onDismissRequest = { // Ця лямбда викликається при кліку на фон або кнопку Скасувати
+                        showGroupDialog = false // Просто приховуємо діалог
+                        selectedGroupId = null // Скидаємо обрану групу
+                    }
+                ) }
 }
+

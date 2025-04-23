@@ -43,10 +43,24 @@ class MainActivity : ComponentActivity() {
 }
 @Composable
 fun MainScreen(practiceRepo: PracticeRepository) {
+    val authRepo = remember { com.example.wordboost.data.firebase.AuthRepository() }
+    var currentUser by remember { mutableStateOf(authRepo.getCurrentUser()) }
+    var showLogin by remember { mutableStateOf(currentUser == null) }
+    var showRegister by remember { mutableStateOf(false) }
+
     var showTranslateScreen by remember { mutableStateOf(false) }
     var showPracticeScreen by remember { mutableStateOf(false) }
 
     when {
+        showLogin -> {
+            LoginScreen(authRepo = authRepo) {
+                currentUser = authRepo.getCurrentUser()
+                showLogin = false
+            }
+        }
+        showRegister -> {
+            RegisterScreen(authRepo = authRepo)
+        }
         showTranslateScreen -> {
             TranslateScreen()
         }
@@ -70,14 +84,32 @@ fun MainScreen(practiceRepo: PracticeRepository) {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Button(onClick = { /* TODO: словник */ }) {
-                    Text("Мій словник")
+                Button(onClick = { showPracticeScreen = true }) {
+                    Text("Практика")
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Button(onClick = { showPracticeScreen = true }) {
-                    Text("Практика")
+                Button(onClick = {
+                    showRegister = true
+                    showLogin = false
+                }) {
+                    Text("Реєстрація")
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(onClick = {
+                    authRepo.getCurrentUser()?.let {
+                        it.reload()
+                        if (!it.isEmailVerified) {
+                            showLogin = true
+                        }
+                    } ?: run {
+                        showLogin = true
+                    }
+                }) {
+                    Text("Вийти / Увійти знову")
                 }
             }
         }

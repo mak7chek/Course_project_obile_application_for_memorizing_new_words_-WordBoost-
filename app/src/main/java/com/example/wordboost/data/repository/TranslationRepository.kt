@@ -45,7 +45,5 @@ class TranslationRepository(
         }
     }
 
-    fun saveToFirebase(text: String, translated: String) {
-        firebaseRepo.saveTranslation(text, translated)
-    }
+
 } 

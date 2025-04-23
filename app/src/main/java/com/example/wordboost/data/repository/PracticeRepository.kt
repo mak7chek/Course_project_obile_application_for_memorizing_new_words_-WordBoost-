@@ -4,43 +4,45 @@ import com.example.wordboost.data.firebase.FirebaseRepository
 import com.example.wordboost.data.model.Word
 import com.example.wordboost.data.model.PracticeUtils
 
-class PracticeRepository(private val firebaseRepo: FirebaseRepository) {
-
+class PracticeRepository(private val firebase: FirebaseRepository) {
     fun getWordsForPractice(callback: (List<Word>) -> Unit) {
-        firebaseRepo.getUserWordsForPractice { words ->
-            callback(words)
-        }
+        firebase.getUserWordsForPractice(callback)
     }
 
-    fun updateWordAfterPractice(word: Word, success: Boolean, callback: () -> Unit) {
-        val newKnowledgeLevel = when {
-            success && word.knowledgeLevel < 5 -> word.knowledgeLevel + 1
-            !success && word.knowledgeLevel > 0 -> word.knowledgeLevel - 1
-            else -> word.knowledgeLevel
-        }
-
-        val nextReview = PracticeUtils.calculateNextReviewTime(newKnowledgeLevel)
-        val updatedWord = word.copy(
-            knowledgeLevel = newKnowledgeLevel,
-            lastReviewed = System.currentTimeMillis(),
-            nextReview = nextReview,
-            status = if (newKnowledgeLevel >= 5) "learned" else "learning"
+    /**
+     * @param quality 0..5 (5 — perfect)
+     */
+    fun updateWordAfterPractice(
+        word: Word,
+        quality: Int,
+        callback: () -> Unit
+    ) {
+        val (rep, ef, interval) = PracticeUtils.sm2(
+            word.repetition, word.easiness, word.interval, quality
         )
-
-        firebaseRepo.saveWord(updatedWord) {
-            callback()
-        }
+        val now = System.currentTimeMillis()
+        val next = now + interval
+        val status = PracticeUtils.determineStatus(rep)
+        val updated = word.copy(
+            repetition = rep,
+            easiness = ef,
+            interval = interval,
+            lastReviewed = now,
+            nextReview = next,
+            status = status
+        )
+        firebase.saveWord(updated) { callback() }
     }
 
     fun resetWordProgress(word: Word, callback: () -> Unit) {
-        val resetWord = word.copy(
-            knowledgeLevel = 0,
+        val reset = word.copy(
+            repetition = 0,
+            easiness = 2.5f,
+            interval = 0L,
             lastReviewed = 0L,
             nextReview = 0L,
             status = "new"
         )
-        firebaseRepo.saveWord(resetWord) {
-            callback()
-        }
+        firebase.saveWord(reset) { callback() }
     }
 }
