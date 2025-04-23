@@ -4,25 +4,27 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import com.example.wordboost.data.firebase.FirebaseRepository
+import com.example.wordboost.data.firebase.*
 import com.example.wordboost.data.local.AppDatabase
 import com.example.wordboost.data.model.Word
 import com.example.wordboost.data.repository.TranslationRepository
 import com.example.wordboost.translation.RealTranslator
 import com.example.wordboost.ui.components.CustomGroupDialog
 import com.example.wordboost.data.firebase.Group
-import androidx.compose.runtime.rememberCoroutineScope
+import com.example.wordboost.data.firebase.AuthRepository
 import androidx.room.Room
 import java.util.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TranslateScreen() {
+fun TranslateScreen(onBack: () -> Unit) {
     val context = LocalContext.current
 
     val db = remember {
@@ -52,7 +54,12 @@ fun TranslateScreen() {
         firebaseRepo.getGroups { fetched -> groups = fetched }
     }
 
-    Scaffold(topBar = { CenterAlignedTopAppBar(title = { Text("WordBoost") }) }) { padding ->
+    Scaffold(
+        topBar = {
+            Button(onClick = onBack) { // <-- Викликаємо onBack при натисканні
+                Text("Назад")
+            }
+            CenterAlignedTopAppBar(title = { Text("WordBoost") }) }) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
@@ -110,6 +117,7 @@ fun TranslateScreen() {
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 // Додати в словник
+
                 Button(
                     onClick = {
                         // ... ваша логіка збереження в словник ...
@@ -124,7 +132,6 @@ fun TranslateScreen() {
                             } else {
                                 val id = UUID.nameUUIDFromBytes((original + translated).toByteArray()).toString()
                                 val word = Word(
-                                    userId = "testUser", // ПЕРЕВІРТЕ userId
                                     id = id,
                                     text = original,
                                     translation = translated,
@@ -151,13 +158,7 @@ fun TranslateScreen() {
                     Text("Додати до групи")
                 }
             }
-                    // Add to group
-                    Button(
-                        onClick = { showGroupDialog = true },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Додати до групи")
-                    }
+
                 }
             }
 
@@ -219,7 +220,6 @@ fun TranslateScreen() {
                                 // Слово НЕ ЗНАЙДЕНО, створюємо НОВЕ слово з вказаною групою
                                 val id = UUID.nameUUIDFromBytes((original + translated + groupId).toByteArray()).toString()
                                 val newWord = Word(
-                                    userId = "testUser", // ПЕРЕВІРТЕ, ЩО ВИКОРИСТОВУЄТЬСЯ ПРАВИЛЬНИЙ ID КОРИСТУВАЧА
                                     id = id,
                                     text = original,
                                     translation = translated,
@@ -229,7 +229,7 @@ fun TranslateScreen() {
                                     interval = 0L,
                                     lastReviewed = 0L,
                                     nextReview = 0L,
-                                    status = "new" // Нове слово має статус "new"
+                                    status = "new"
                                 )
                                 firebaseRepo.saveWord(newWord) { success ->
                                     statusMessage = if (success) "Слово додано до групи" else "Помилка збереження слова в групу"

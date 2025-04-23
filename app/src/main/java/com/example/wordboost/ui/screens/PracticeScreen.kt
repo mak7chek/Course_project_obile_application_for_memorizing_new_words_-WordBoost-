@@ -33,7 +33,7 @@ enum class DragAnchors {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class) // Додано ExperimentalFoundationApi
 @Composable
-fun PracticeScreen(practiceRepo: PracticeRepository) {
+fun PracticeScreen(practiceRepo: PracticeRepository,onBack: () -> Unit) {
     var words by remember { mutableStateOf<List<Word>>(emptyList()) }
     var currentIndex by remember { mutableStateOf(0) }
     var isFlipped by remember { mutableStateOf(false) }
@@ -131,7 +131,12 @@ fun PracticeScreen(practiceRepo: PracticeRepository) {
 
 
     Scaffold(
-        topBar = { CenterAlignedTopAppBar(title = { Text("Практика слів") }) }
+        topBar = {
+            Button(onClick = onBack) { // <-- Викликаємо onBack при натисканні
+                Text("Назад")
+            }
+            CenterAlignedTopAppBar(title = { Text("Практика слів") })
+        }
     ) { padding ->
         Box(
             Modifier
@@ -140,6 +145,7 @@ fun PracticeScreen(practiceRepo: PracticeRepository) {
                 .padding(16.dp), // Загальний відступ для Box
             contentAlignment = Alignment.Center
         ) {
+
             if (words.isEmpty()) {
                 CircularProgressIndicator() // Краще індикатор, ніж текст
             } else {

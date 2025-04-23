@@ -1,7 +1,6 @@
 package com.example.wordboost.data.model
 
 data class Word(
-    val userId: String = "",
     val id: String = "",
     val text: String = "",
     val translation: String = "",

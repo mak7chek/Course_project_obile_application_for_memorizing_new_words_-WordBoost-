@@ -61,8 +61,8 @@ android {
 }
 
 dependencies {
-    implementation("androidx.compose.material3:material3:1.3.0-alpha05")
-    implementation("androidx.compose.foundation:foundation:1.7.0-alpha08")
+    implementation("androidx.compose.material3:material3:1.3.2")
+    implementation ("androidx.compose.foundation:foundation:1.7.8")
     implementation("androidx.room:room-runtime:2.6.1")
     implementation(libs.androidx.media3.common.ktx)
     kapt("androidx.room:room-compiler:2.6.1")
