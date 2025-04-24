@@ -24,6 +24,12 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import kotlin.random.Random // Потрібно для isReverse
 
+// --- Імпорти для кнопки Назад та BackHandler ---
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.activity.compose.BackHandler // !!! Додайте цей імпорт !!!
+
+
 // Залишаємо enum тут або виносимо в окремий файл
 enum class DragAnchors {
     Start,
@@ -33,7 +39,7 @@ enum class DragAnchors {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class) // Додано ExperimentalFoundationApi
 @Composable
-fun PracticeScreen(practiceRepo: PracticeRepository,onBack: () -> Unit) {
+fun PracticeScreen(practiceRepo: PracticeRepository, onBack: () -> Unit) { // onBack лямбда вже є
     var words by remember { mutableStateOf<List<Word>>(emptyList()) }
     var currentIndex by remember { mutableStateOf(0) }
     var isFlipped by remember { mutableStateOf(false) }
@@ -59,13 +65,13 @@ fun PracticeScreen(practiceRepo: PracticeRepository,onBack: () -> Unit) {
     }
 
     // --- Обробник результату свайпу та переходу до наступного слова ---
-    val currentMoveToNextWord by rememberUpdatedState { known: Boolean ->
+    val currentMoveToNextWord by rememberUpdatedState { rezalt: Int -> // Перейменовано параметр з known на rezalt (0 або 5)
         if (words.isEmpty()) return@rememberUpdatedState
         val wordToUpdate = words.getOrNull(currentIndex) ?: return@rememberUpdatedState
-        val rezalt = if (known) 5 else 0
+        // Використовуємо rezalt (0 або 5) прямо тут
 
         practiceRepo.updateWordAfterPractice(wordToUpdate,rezalt) {
-            statusMessage = if (known) "Чудово!" else "Не біда, вивчимо!"
+            statusMessage = if (rezalt == 5) "Чудово!" else "Не біда, вивчимо!" // Оновлено текст статусу
             val nextIndex = if (words.isNotEmpty()) (currentIndex + 1) % words.size else 0
             currentIndex = nextIndex
             isFlipped = false // Завжди скидаємо перевертання
@@ -122,20 +128,29 @@ fun PracticeScreen(practiceRepo: PracticeRepository,onBack: () -> Unit) {
         // Діємо тільки якщо картка була перевернута І свайпнута до кінця
         if (isFlipped) {
             when (target) {
-                DragAnchors.Know -> currentMoveToNextWord(true)
-                DragAnchors.DontKnow -> currentMoveToNextWord(false)
+                DragAnchors.Know -> currentMoveToNextWord(5) // Передаємо 5 для "Пам'ятаю"
+                DragAnchors.DontKnow -> currentMoveToNextWord(0) // Передаємо 0 для "Не пам'ятаю"
                 DragAnchors.Start -> { /* Нічого не робити при поверненні до старту */ }
             }
         }
     }
 
+    // !!! Додаємо обробник системного свайпу назад (або натискання кнопки Назад) !!!
+    BackHandler(enabled = true) { // enabled = true означає, що обробник завжди активний
+        onBack() // Викликаємо зовнішню лямбду onBack
+    }
+
 
     Scaffold(
         topBar = {
-            Button(onClick = onBack) { // <-- Викликаємо onBack при натисканні
-                Text("Назад")
-            }
-            CenterAlignedTopAppBar(title = { Text("Практика слів") })
+            TopAppBar( // !!! Змінюємо на TopAppBar для додавання navigationIcon !!!
+                title = { Text("Практика слів") }, // Залишаємо заголовок
+                navigationIcon = { // !!! Додаємо navigationIcon слот для кнопки Назад !!!
+                    IconButton(onClick = onBack) { // Кнопка Назад, яка викликає onBack
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                    }
+                }
+            )
         }
     ) { padding ->
         Box(
@@ -147,7 +162,7 @@ fun PracticeScreen(practiceRepo: PracticeRepository,onBack: () -> Unit) {
         ) {
 
             if (words.isEmpty()) {
-                CircularProgressIndicator() // Краще індикатор, ніж текст
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center)) // Краще індикатор по центру
             } else {
                 words.getOrNull(currentIndex)?.let { word ->
 
@@ -176,39 +191,43 @@ fun PracticeScreen(practiceRepo: PracticeRepository,onBack: () -> Unit) {
                                 enabled = isFlipped // Свайп можливий ТІЛЬКИ коли картка перевернута
                             )
                     )
-                } ?: Text("Помилка: Не вдалося отримати слово") // На випадок проблеми з індексом
-
-                statusMessage?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.secondary,
-                        // Розміщуємо під карткою, а не в самому низу екрану
-                        modifier = Modifier
-                            .align(Alignment.Center) // Центруємо текст під карткою
-                            .padding(top = 300.dp)
-                        // Відступ зверху відносно центру Box (підібрати значення)
-                    )
-                }
+                } ?: Text("Помилка: Не вдалося отримати слово", modifier = Modifier.align(Alignment.Center)) // На випадок проблеми з індексом - по центру
 
                 // Прогрес (з виправленим обчисленням)
                 if (words.isNotEmpty()) {
+                    // Перемістимо індикатор прогресу і лічильник всередину головного Box,
+                    // щоб вони розміщувалися відносно нього, а не відносно картки.
                     LinearProgressIndicator(
                         // --- ВИПРАВЛЕНО: Використовуємо toFloat ---
                         progress = { (currentIndex + 1).toFloat() / words.size.toFloat() },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .align(Alignment.TopCenter)
-                            .padding(top = 8.dp) // Відступ зверху від AppBar
+                            .align(Alignment.TopCenter) // Вирівнюємо зверху по центру Box
+                            .padding(top = 0.dp) // Можна залишити 0 або додати невеликий відступ
                     )
                     Text( // Додамо лічильник слів
                         text = "${currentIndex + 1} / ${words.size}",
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(top = 16.dp, end = 16.dp) // Відступи справа та зверху
+                            .align(Alignment.TopEnd) // Вирівнюємо зверху справа Box
+                            .padding(top = 4.dp, end = 4.dp) // Відступи справа та зверху
+                    )
+                }
+
+
+
+                // Повідомлення про статус - залишаємо його внизу, але можемо додати відступ
+                statusMessage?.let {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter) // Вирівнюємо знизу по центру Box
+                            .padding(bottom = 16.dp) // Відступ знизу
                     )
                 }
             }
+
         }
     }
 }

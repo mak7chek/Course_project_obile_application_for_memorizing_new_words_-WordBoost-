@@ -1,3 +1,4 @@
+
 package com.example.wordboost.data.firebase
 
 import com.example.wordboost.data.model.Word
@@ -7,28 +8,28 @@ import com.google.firebase.ktx.Firebase
 import com.google.firebase.auth.FirebaseAuth
 
 /**
- * Репозиторій для роботи зі словами у Firestore
+ * Репозиторій для роботи зі словами та групами у Firestore, прив'язаними до користувача
  */
 class FirebaseRepository {
 
     private val db = Firebase.firestore
-    private val wordsCollection = db.collection("words")
-    private val groupsCollection = db.collection("groups")
+    private val userId: String
+        get() = FirebaseAuth.getInstance().currentUser?.uid ?: "testUser"
 
-    /**
-     * Отримати слова для практики (nextReview <= зараз, статус != "mastered")
-     */
+    private val wordsCollection
+        get() = db.collection("users").document(userId).collection("words")
+
+    private val groupsCollection
+        get() = db.collection("users").document(userId).collection("groups")
+
     fun getUserWordsForPractice(callback: (List<Word>) -> Unit) {
-        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "testUser"
         val now = System.currentTimeMillis()
-
         wordsCollection
-            .whereEqualTo("userId", "testUser")
-//            .whereLessThanOrEqualTo("nextReview", now)
+            .whereLessThanOrEqualTo("nextReview", now) // Додано фільтр на стороні сервера
             .get()
             .addOnSuccessListener { result ->
                 val words = result.documents.mapNotNull { it.toObject(Word::class.java) }
-                    .filter { it.status != "mastered" }
+                    .filter { it.status != "mastered" } // Фільтр за статусом залишаємо на клієнті, якщо Firestore не підтримує комбінований індекс (або якщо це не велика кількість "mastered" слів). Якщо статус часто "mastered", краще додати його в where clause, якщо це можливо з індексами.
                 callback(words)
             }
             .addOnFailureListener {
@@ -36,9 +37,6 @@ class FirebaseRepository {
             }
     }
 
-    /**
-     * Отримати Word за текстом
-     */
     fun getWordObject(text: String, callback: (Word?) -> Unit) {
         wordsCollection
             .whereEqualTo("text", text)
@@ -53,18 +51,33 @@ class FirebaseRepository {
             }
     }
 
-    /**
-     * Отримати переклад для тексту (через Word.translation)
-     */
     fun getTranslation(text: String, callback: (String?) -> Unit) {
-        getWordObject(text) { word ->
-            callback(word?.translation)
-        }
+        wordsCollection
+            .whereEqualTo("text", text)
+            .limit(1)
+            .get()
+            .addOnSuccessListener { docs ->
+                if (docs.isEmpty) {
+
+                    wordsCollection
+                        .whereEqualTo("translation", text)
+                        .limit(1)
+                        .get()
+                        .addOnSuccessListener { altDocs ->
+                            val word = altDocs.firstOrNull()?.toObject(Word::class.java)
+                            callback(word?.text)
+                        }
+                        .addOnFailureListener { callback(null) }
+                } else {
+                    val word = docs.firstOrNull()?.toObject(Word::class.java)
+                    callback(word?.translation)
+                }
+            }
+            .addOnFailureListener {
+                callback(null)
+            }
     }
 
-    /**
-     * Зберегти або оновити Word у Firestore
-     */
     fun saveWord(word: Word, callback: (Boolean) -> Unit = {}) {
         wordsCollection.document(word.id)
             .set(word, SetOptions.merge())
@@ -72,9 +85,6 @@ class FirebaseRepository {
             .addOnFailureListener { callback(false) }
     }
 
-    /**
-     * Отримати усі групи
-     */
     fun getGroups(callback: (List<Group>) -> Unit) {
         groupsCollection
             .get()
@@ -91,9 +101,6 @@ class FirebaseRepository {
             }
     }
 
-    /**
-     * Створити нову групу
-     */
     fun createGroup(name: String, callback: (Boolean) -> Unit) {
         val group = mapOf("name" to name)
         groupsCollection
@@ -102,9 +109,6 @@ class FirebaseRepository {
             .addOnFailureListener { callback(false) }
     }
 
-    /**
-     * Оновити назву групи
-     */
     fun updateGroup(groupId: String, newName: String, callback: (Boolean) -> Unit) {
         groupsCollection.document(groupId)
             .update("name", newName)
@@ -112,9 +116,6 @@ class FirebaseRepository {
             .addOnFailureListener { callback(false) }
     }
 
-    /**
-     * Видалити групу
-     */
     fun deleteGroup(groupId: String, callback: (Boolean) -> Unit) {
         groupsCollection.document(groupId)
             .delete()
