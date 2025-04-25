@@ -10,44 +10,72 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.wordboost.ui.theme.Course_project_obile_application_for_memorizing_new_words_WordBoostTheme
 import com.google.firebase.FirebaseApp
 import com.example.wordboost.data.firebase.FirebaseRepository
 import com.example.wordboost.data.repository.PracticeRepository
 import com.example.wordboost.ui.screens.*
-import com.google.firebase.auth.FirebaseAuth
 
-// Визначаємо стани програми для навігації
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import java.util.concurrent.TimeUnit
+import com.example.wordboost.data.local.CacheClearWorker
+
 enum class AppState {
-    Loading,             // Початковий стан, поки перевіряємо аутентифікацію
-    UnauthenticatedChoice, // Користувач не увійшов, показуємо вибір між входом і реєстрацією
-    Login,               // Показуємо екран входу
-    Register,            // Показуємо екран реєстрації
-    AuthenticatedMain,   // Користувач увійшов, показуємо головне меню
-    AuthenticatedTranslate, // Користувач увійшов, показуємо екран перекладу
-    AuthenticatedPractice // Користувач увійшов, показуємо екран практики
+    Loading,
+    UnauthenticatedChoice,
+    Login,
+    Register,
+    AuthenticatedMain,
+    AuthenticatedTranslate,
+    AuthenticatedPractice
 }
 
-
 class MainActivity : ComponentActivity() {
+
+    // !!! Визначаємо константи для WorkManager !!!
+    private val CACHE_CLEAR_WORK_NAME = "CacheClearWork"
+    private val REPEAT_INTERVAL_DAYS: Long = 6
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         FirebaseApp.initializeApp(this)
-
+        scheduleCacheClearWork()
         val firebaseRepo = FirebaseRepository()
         val practiceRepo = PracticeRepository(firebaseRepo)
-        val authRepo = com.example.wordboost.data.firebase.AuthRepository() // Створюємо тут для доступності
+        val authRepo = com.example.wordboost.data.firebase.AuthRepository()
 
         setContent {
             Course_project_obile_application_for_memorizing_new_words_WordBoostTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    // Передаємо AuthRepository
                     MainScreen(authRepo = authRepo, practiceRepo = practiceRepo)
                 }
             }
         }
+    }
+
+    private fun scheduleCacheClearWork() {
+        val cacheClearRequest = PeriodicWorkRequestBuilder<CacheClearWorker>(
+            repeatInterval = REPEAT_INTERVAL_DAYS,
+            repeatIntervalTimeUnit = TimeUnit.DAYS
+        )
+            // Додайте constraints(), якщо потрібно, наприклад:
+            // .setConstraints(Constraints.Builder().setRequiresCharging(true).build()) // Запускати лише під час зарядки
+            // .setInitialDelay(1, TimeUnit.HOURS) // Затримати перший запуск на 1 годину
+            .build()
+
+        // Enqueue - ставимо завдання в чергу на виконання
+        // enqueueUniquePeriodicWork - гарантує, що буде лише одне активне завдання з таким ім'ям
+        // ExistingPeriodicWorkPolicy.KEEP - якщо завдання вже існує, залишаємо старе і не створюємо нове
+        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+            CACHE_CLEAR_WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            cacheClearRequest
+        )
+
+        Log.d("WorkManager", "$CACHE_CLEAR_WORK_NAME заплановано з політикою KEEP на повторення кожні $REPEAT_INTERVAL_DAYS днів.")
     }
 }
 

@@ -61,6 +61,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation("androidx.compose.material3:material3:1.3.2")
     implementation ("androidx.compose.foundation:foundation:1.7.8")
     implementation("androidx.room:room-runtime:2.6.1")
