@@ -14,7 +14,7 @@ class CacheClearWorker(appContext: Context, workerParams: WorkerParameters) :
 
     // Визначаємо, що вважається "старим" записом
     // Наприклад, видаляємо записи, які не оновлювалися/використовувалися 30 днів
-    private val OLD_ENTRY_THRESHOLD_DAYS = 30
+    private val OLD_ENTRY_THRESHOLD_DAYS = 6
     private val OLD_ENTRY_THRESHOLD_MILLIS = TimeUnit.DAYS.toMillis(OLD_ENTRY_THRESHOLD_DAYS.toLong())
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {

@@ -35,7 +35,7 @@ class FirebaseRepository {
             .addOnFailureListener {
                 callback(emptyList())
             }
-    }/*TODO*/
+    }
 
     fun getWordObject(text: String, callback: (Word?) -> Unit) {
         wordsCollection

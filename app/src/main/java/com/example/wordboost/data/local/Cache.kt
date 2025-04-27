@@ -32,7 +32,7 @@ interface CacheDao {
     fun clearOldEntries(thresholdTime: Long)
 }
 
-@Database(entities = [CacheEntity::class], version = 1, exportSchema = false)
+@Database(entities = [CacheEntity::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun cacheDao(): CacheDao
 
