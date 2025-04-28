@@ -8,7 +8,6 @@ import retrofit2.converter.gson.GsonConverterFactory
 object RetrofitInstance {
     private const val BASE_URL = "https://api-free.deepl.com/"
 
-    // Створюємо клієнт з авторизаційним заголовком
     private val client = OkHttpClient.Builder()
         .addInterceptor { chain ->
             val request = chain.request().newBuilder()
@@ -19,16 +18,14 @@ object RetrofitInstance {
         }
         .build()
 
-    // Створюємо Retrofit з цим клієнтом
     private val retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
-            .client(client) // додаємо клієнт
+            .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
 
-    // Створюємо API
     val api: TranslatorService by lazy {
         retrofit.create(TranslatorService::class.java)
     }

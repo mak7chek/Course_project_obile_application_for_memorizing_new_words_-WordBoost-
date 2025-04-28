@@ -15,24 +15,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-// Імпорт репозиторію (для Factory)
 import com.example.wordboost.data.firebase.FirebaseRepository
-// Імпорт моделей
 import com.example.wordboost.data.model.Group
 import com.example.wordboost.data.model.Word
 
-// Імпорт ViewModel та Factory з presentation.viewmodel пакета
 import com.example.wordboost.viewmodel.WordListViewModel
 import com.example.wordboost.viewmodel.WordListViewModelFactory
 import com.example.wordboost.viewmodel.WordDisplayItem
 
-// Імпорт компонентів з presentation.ui.components пакета
 import com.example.wordboost.ui.components.WordListItem
-// Імпорт CustomGroupDialog, якщо він використовується тут
-// import com.example.wordboost.presentation.ui.components.CustomGroupDialog
 
-
-// Імпорти для іконок
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import kotlinx.coroutines.launch
 
@@ -45,9 +37,7 @@ fun WordListScreen(
     onBack: () -> Unit
 ) {
     val viewModel: WordListViewModel = viewModel(factory = WordListViewModelFactory(repository = repository))
-
-    // Спостерігаємо за станом з ViewModel
-    val displayedWords by viewModel.displayedWords.observeAsState(initial = emptyList()) // Список для відображення
+    val displayedWords by viewModel.displayedWords.observeAsState(initial = emptyList())
     val groups by viewModel.groups.observeAsState(initial = emptyList())
     val isLoading by viewModel.isLoading.observeAsState(initial = false)
     val errorMessage by viewModel.errorMessage.observeAsState()
@@ -102,7 +92,7 @@ fun WordListScreen(
             )
 
             // Фільтр за групами
-            GroupFilterDropdown( // Припускаємо, що цей Composable визначений нижче в цьому ж файлі
+            GroupFilterDropdown(
                 groups = groups,
                 selectedGroupId = selectedGroupIdFilter,
                 onGroupSelected = { groupId -> viewModel.setGroupFilter(groupId) }
@@ -112,9 +102,7 @@ fun WordListScreen(
             if (isLoading) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
-
-            // Відображення списку або повідомлення про порожній стан
-            if (displayedWords.isEmpty() && !isLoading) { // Показуємо текст, якщо список порожній і не завантажуємо
+            if (displayedWords.isEmpty() && !isLoading) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -152,13 +140,10 @@ fun WordListScreen(
                     }
                 }
             }
-            // Примітка: Якщо isLoading true, LinearProgressIndicator вже показаний зверху.
         }
     }
 }
 
-// Composable для вибору групи (DropdownMenu). Можна залишити тут або перенести в components.
-// ... (цей код залишається без змін, як у попередньому пості) ...
 @Composable
 fun GroupFilterDropdown(
     groups: List<Group>,

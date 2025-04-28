@@ -9,14 +9,7 @@ import com.google.firebase.auth.FirebaseUser
 class AuthRepository {
 
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
-    /**
-     * Реєструє нового користувача за допомогою email та пароля.
-     * Після успішної реєстрації автоматично намагається надіслати лист верифікації.
-     *
-     * @param email Email користувача.
-     * @param password Пароль користувача.
-     * @param onResult Колбек, що повертає результат реєстрації: Boolean (успіх/невдача) та String (повідомлення).
-     */
+
     fun registerUser(email: String, password: String, onResult: (Boolean, String?) -> Unit) {
         auth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
@@ -43,11 +36,6 @@ class AuthRepository {
             }
     }
 
-    /**
-     * Надсилає лист верифікації на email поточного користувача.
-     *
-     * @param onResult Колбек, що повертає результат надсилання: Boolean (успіх/невдача) та String (повідомлення).
-     */
     fun sendEmailVerification(onResult: (Boolean, String?) -> Unit) {
         val user = auth.currentUser
         if (user != null && !user.isEmailVerified) {
@@ -65,12 +53,6 @@ class AuthRepository {
         }
     }
 
-    /**
-     * Перевіряє, чи поточний користувач верифікував свій email.
-     * Виконує перезавантаження даних користувача для отримання актуального стану.
-     *
-     * @param onResult Колбек, що повертає Boolean (true, якщо верифіковано) та можливе повідомлення про помилку/стан.
-     */
     fun isUserVerified(onResult: (Boolean, String?) -> Unit) {
         val user = auth.currentUser
         if (user != null) {
@@ -88,20 +70,9 @@ class AuthRepository {
         }
     }
 
-    /**
-     * Повертає поточного аутентифікованого користувача Firebase.
-     * Повертає null, якщо користувач не увійшов.
-     */
     fun getCurrentUser(): FirebaseUser? = auth.currentUser
 
-    /**
-     * Виконує вхід користувача за допомогою email та пароля.
-     * Перевіряє статус верифікації email після успішного входу.
-     *
-     * @param email Email користувача.
-     * @param password Пароль користувача.
-     * @param onResult Колбек, що повертає результат входу: Boolean (успіх/невдача) та String (повідомлення).
-     */
+
     fun loginUser(email: String, password: String, onResult: (Boolean, String?) -> Unit) {
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
@@ -132,9 +103,6 @@ class AuthRepository {
             }
     }
 
-    /**
-     * Виконує вихід поточного користувача з облікового запису.
-     */
     fun logout() {
         auth.signOut()
     }

@@ -9,9 +9,6 @@ class PracticeRepository(private val firebase: FirebaseRepository) {
         firebase.getUserWordsForPractice(callback)
     }
 
-    /**
-     * @param quality 0..5 (5 — perfect)
-     */
     fun updateWordAfterPractice(
         word: Word,
         quality: Int,

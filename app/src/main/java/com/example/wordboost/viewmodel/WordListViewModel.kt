@@ -18,10 +18,7 @@ data class WordDisplayItem(
 
 class WordListViewModel(private val repository: FirebaseRepository) : ViewModel() {
 
-    // Приватні LiveData для зберігання вихідних даних
     private val _allWords = MutableLiveData<List<Word>>(emptyList())
-
-    // Публічні LiveData для стану UI (спостерігаються в Compose)
     private val _displayedWords = MutableLiveData<List<WordDisplayItem>>(emptyList())
     val displayedWords: LiveData<List<WordDisplayItem>> get() = _displayedWords
 
@@ -34,19 +31,11 @@ class WordListViewModel(private val repository: FirebaseRepository) : ViewModel(
     private val _errorMessage = MutableLiveData<String?>(null)
     val errorMessage: LiveData<String?> get() = _errorMessage
 
-
-    // Стан фільтрації/пошуку - ПРИВАТНА ЗМІННА
-    private var currentSearchQuery: String = "" // <-- ПЕРЕКОНАЙТЕСЬ, ЩО ЦЕЙ РЯДОК Є У ВАШОМУ КОДІ
-
-
-    // Приватна LiveData для внутрішнього стану фільтра групи
+    private var currentSearchQuery: String = ""
     private val _selectedGroupIdFilter = MutableLiveData<String?>(null)
 
-    // Публічна LiveData для поточного обраного фільтра групи (щоб UI міг її спостерігати)
     val selectedGroupIdFilter: LiveData<String?> get() = _selectedGroupIdFilter
 
-
-    // LiveData для поточного пошукового запиту (щоб поле пошуку в UI оновлювалося)
     private val _searchQuery = MutableLiveData<String>("")
     val searchQuery: LiveData<String> get() = _searchQuery
 
@@ -56,7 +45,6 @@ class WordListViewModel(private val repository: FirebaseRepository) : ViewModel(
         loadGroups()
     }
 
-    // Завантажує всі слова користувача
     fun loadWords() {
         _isLoading.value = true
         repository.getAllWords { words ->
@@ -86,9 +74,6 @@ class WordListViewModel(private val repository: FirebaseRepository) : ViewModel(
     }
 
 
-    /**
-     * Застосовує поточні фільтри та пошуковий запит до списку слів.
-     */
     private fun applyFiltersAndSearch() {
         val words = _allWords.value ?: emptyList()
         val groupsById = _groups.value.orEmpty().associateBy { it.id }
@@ -100,13 +85,10 @@ class WordListViewModel(private val repository: FirebaseRepository) : ViewModel(
                 "no_group_filter" -> word.dictionaryId.isEmpty()
                 else -> word.dictionaryId == _selectedGroupIdFilter.value
             }
-
-            // Фільтрація за пошуковим запитом
-            val queryMatch = if (currentSearchQuery.isBlank()) { // <-- Використання currentSearchQuery
+            val queryMatch = if (currentSearchQuery.isBlank()) {
                 true
             } else {
                 val lowerCaseQuery = currentSearchQuery.toLowerCase(Locale.ROOT)
-                // Виправлення неоднозначності: Явно приводимо lowerCaseQuery до CharSequence
                 word.text.toLowerCase(Locale.ROOT).contains(lowerCaseQuery as CharSequence) ||
                         word.translation.toLowerCase(Locale.ROOT).contains(lowerCaseQuery as CharSequence)
             }
@@ -121,28 +103,18 @@ class WordListViewModel(private val repository: FirebaseRepository) : ViewModel(
         _displayedWords.value = displayItems
     }
 
-    /**
-     * Оновлює пошуковий запит та застосовує фільтри. Викликається з UI.
-     */
     fun setSearchQuery(query: String) {
         currentSearchQuery = query // <-- Використання currentSearchQuery
         _searchQuery.value = query
         applyFiltersAndSearch()
     }
 
-    /**
-     * Оновлює фільтр за групою та застосовує фільтри. Викликається з UI.
-     * @param groupId ID обраної групи, або null/"" для "Всі групи", або "no_group_filter" для "Без групи".
-     */
     fun setGroupFilter(groupId: String?) {
         _selectedGroupIdFilter.value = groupId
         applyFiltersAndSearch()
     }
 
 
-    /**
-     * Видалити слово.
-     */
     fun deleteWord(wordId: String) {
         _isLoading.value = true
         repository.deleteWord(wordId) { success ->
@@ -157,9 +129,7 @@ class WordListViewModel(private val repository: FirebaseRepository) : ViewModel(
         }
     }
 
-    /**
-     * Скинути статистику слова.
-     */
+
     fun resetWord(word: Word) {
         val resetWord = word.copy(
             repetition = 0, easiness = 2.5f, interval = 0L, lastReviewed = 0L, nextReview = System.currentTimeMillis(), status = PracticeUtils.determineStatus(0)
@@ -177,9 +147,7 @@ class WordListViewModel(private val repository: FirebaseRepository) : ViewModel(
             }
         }
     }
-    // Функція-заглушка для дії "Редагувати". UI обробляє навігацію.
     fun onEditWordClicked(word: Word) {
-        // UI має обробити навігацію
     }
 
 

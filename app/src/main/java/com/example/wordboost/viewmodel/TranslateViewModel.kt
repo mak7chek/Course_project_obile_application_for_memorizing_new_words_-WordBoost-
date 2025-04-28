@@ -19,7 +19,6 @@ class TranslateViewModel(
     private val translationRepository: TranslationRepository
 ) : ViewModel() {
 
-    // Стан UI (використовуємо StateFlow, як обговорювали раніше)
     private val _ukText = MutableStateFlow("")
     val ukText: StateFlow<String> = _ukText.asStateFlow()
 
@@ -44,29 +43,23 @@ class TranslateViewModel(
 
     init {
         loadGroups()
-        // Встановлюємо початкове значення обраної групи на "Основний словник"
-        _selectedGroupId.value = "" // Пустий рядок відповідає "Основному словнику"
+        _selectedGroupId.value = ""
     }
 
     // Функції для зміни стану з UI
     fun setUkText(text: String) {
         _ukText.value = text
-        // При зміні тексту скидаємо вибір групи та повідомлення
+
         _selectedGroupId.value = ""
         _statusMessage.value = null
     }
 
     fun setEnText(text: String) {
         _enText.value = text
-        // При зміні тексту скидаємо вибір групи та повідомлення
         _selectedGroupId.value = ""
         _statusMessage.value = null
     }
 
-    /**
-     * Встановлює повідомлення про статус, яке буде відображено в UI (наприклад, в Snackbar).
-     * Викликається з ViewModel для асинхронних операцій або з UI для простих валідацій.
-     */
     fun setStatusMessage(message: String?) {
         _statusMessage.value = message
     }
@@ -77,17 +70,14 @@ class TranslateViewModel(
 
         _isLoading.value = true
         _statusMessage.value = null
-        _selectedGroupId.value = "" // Скидаємо обрану групу при перекладі нового слова
+        _selectedGroupId.value = ""
 
         val textToTranslate = _ukText.value.ifBlank { _enText.value }
         val lang = if (_ukText.value.isNotBlank()) "EN" else "UK"
 
         viewModelScope.launch {
-            // Припускаємо, що translate - це suspend функція або викликає колбек
-            // Якщо це колбек-орієнтована функція, її потрібно обробляти інакше
-            // Давайте припустимо, що translationRepository.translate використовує колбек, як у вашому оригінальному коді
             translationRepository.translate(textToTranslate, lang) { result ->
-                _isLoading.value = false // Вимикаємо завантаження після отримання результату
+                _isLoading.value = false
                 result?.let { translated ->
                     if (_ukText.value.isNotBlank()) {
                         _enText.value = translated
@@ -155,11 +145,9 @@ class TranslateViewModel(
         }
     }
 
-    // Функції для керування діалогом груп
     fun showGroupDialog() {
-        // UI (кнопка) має контролювати, чи можна показати діалог (чи поля заповнені)
         _showGroupDialog.value = true
-        _statusMessage.value = null // Очищаємо статус при відкритті діалогу
+        _statusMessage.value = null
     }
 
     fun hideGroupDialog() {
@@ -175,15 +163,12 @@ class TranslateViewModel(
         firebaseRepository.getGroups { fetched ->
             val groupsWithSpecial = mutableListOf<Group>()
             groupsWithSpecial.add(Group(id = "", name = "Основний словник"))
-            // Видаляємо "Без групи" тут, оскільки вона більше для фільтрації, а не для вибору куди зберегти.
-            // Якщо хочете збереження "Без групи", тоді id="" буде означати "Без групи"
             groupsWithSpecial.addAll(fetched)
 
             _groups.value = groupsWithSpecial
-            // Переконайтесь, що обрана група все ще існує, інакше скиньте вибір
             val currentSelected = _selectedGroupId.value
             if (currentSelected != null && currentSelected.isNotBlank() && groupsWithSpecial.none { it.id == currentSelected }) {
-                _selectedGroupId.value = "" // Скидаємо вибір, якщо обрана група зникла
+                _selectedGroupId.value = ""
             }
         }
     }
@@ -197,7 +182,7 @@ class TranslateViewModel(
             _isLoading.value = false
             if (success) {
                 _statusMessage.value = "Група '$name' створена"
-                loadGroups() // Оновлюємо список груп
+                loadGroups()
             } else {
                 _statusMessage.value = "Помилка створення групи '$name'"
             }
@@ -213,7 +198,7 @@ class TranslateViewModel(
             _isLoading.value = false
             if (success) {
                 _statusMessage.value = "Група перейменована на '$newName'"
-                loadGroups() // Оновлюємо список груп
+                loadGroups()
             } else {
                 _statusMessage.value = "Помилка перейменування групи"
             }
@@ -229,8 +214,7 @@ class TranslateViewModel(
             _isLoading.value = false
             if (success) {
                 _statusMessage.value = "Група видалена"
-                loadGroups() // Оновлюємо список
-                // Якщо видалили обрану групу, скидаємо вибір на "Основний словник"
+                loadGroups()
                 if (_selectedGroupId.value == groupId) {
                     _selectedGroupId.value = ""
                 }

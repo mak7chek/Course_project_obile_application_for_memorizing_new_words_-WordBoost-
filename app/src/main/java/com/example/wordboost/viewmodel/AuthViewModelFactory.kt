@@ -9,17 +9,15 @@ class AuthViewModelFactory(
 ) : ViewModelProvider.Factory {
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        // Перевіряємо, який саме ViewModel запитують
         return when {
             modelClass.isAssignableFrom(LoginViewModel::class.java) -> {
                 @Suppress("UNCHECKED_CAST")
-                LoginViewModel(authRepository) as T // Створюємо LoginViewModel з репозиторієм
+                LoginViewModel(authRepository) as T
             }
             modelClass.isAssignableFrom(RegisterViewModel::class.java) -> {
                 @Suppress("UNCHECKED_CAST")
-                RegisterViewModel(authRepository) as T // Створюємо RegisterViewModel з репозиторієм
+                RegisterViewModel(authRepository) as T
             }
-            // Додайте інші ViewModel, якщо вони використовують AuthRepository або інші спільні залежності
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }
     }

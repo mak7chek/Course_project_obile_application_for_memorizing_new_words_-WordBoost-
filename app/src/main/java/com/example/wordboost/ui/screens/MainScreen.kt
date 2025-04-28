@@ -13,9 +13,6 @@ import com.example.wordboost.data.repository.TranslationRepository
 
 
 
-
-
-// Enum для керування станом програми (перемикання екранів)
 enum class AppState {
     Loading,
     UnauthenticatedChoice,
@@ -25,25 +22,19 @@ enum class AppState {
     AuthenticatedTranslate,
     AuthenticatedPractice,
     AuthenticatedWordList
-    // TODO: Додати стан для редагування слова, наприклад AuthenticatedEditWord(val wordId: String)
 }
 
 
-// Головний Composable, який відповідає за навігацію/перемикання екранів
 @Composable
 fun MainScreen(
-    // Приймаємо всі необхідні репозиторії як залежності
     authRepo: AuthRepository,
     practiceRepo: PracticeRepository,
     firebaseRepo: FirebaseRepository,
-    translationRepo: TranslationRepository // <-- Додали translationRepo
-    // TODO: Додайте інші репозиторії, якщо ваші інші екрани їх потребують
+    translationRepo: TranslationRepository
 ) {
-    // Стан для керування поточним екраном/станом програми
-    var currentAppState by remember { mutableStateOf<AppState>(AppState.Loading) } // Явно вказуємо тип <AppState>
 
+    var currentAppState by remember { mutableStateOf<AppState>(AppState.Loading) }
 
-    // Ефект для початкової перевірки аутентифікації при першому запуску Composable
     LaunchedEffect(Unit) {
         Log.d("MainScreen", "Checking authentication status...")
         val currentUser = authRepo.getCurrentUser()
@@ -57,16 +48,14 @@ fun MainScreen(
         Log.d("MainScreen", "Initial AppState: $currentAppState")
     }
 
-    // Вибираємо, який екран показувати залежно від поточного стану
     when (currentAppState) {
         AppState.Loading -> {
-            // Можна показати спінер або екран завантаження
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         }
         AppState.UnauthenticatedChoice -> {
-            AuthChoiceScreen( // <-- Тепер імпортується
+            AuthChoiceScreen(
                 onLoginClick = {
                     Log.d("MainScreen", "Navigating to Login")
                     currentAppState = AppState.Login
@@ -78,8 +67,8 @@ fun MainScreen(
             )
         }
         AppState.Login -> {
-            LoginScreen( // <-- Тепер імпортується
-                authRepo = authRepo, // Передаємо залежність
+            LoginScreen(
+                authRepo = authRepo,
                 onSuccess = {
                     Log.d("MainScreen", "Login Success, Navigating to AuthenticatedMain")
                     currentAppState = AppState.AuthenticatedMain
@@ -91,11 +80,10 @@ fun MainScreen(
             )
         }
         AppState.Register -> {
-            RegisterScreen( // <-- Тепер імпортується
-                authRepo = authRepo, // Передаємо залежність
+            RegisterScreen(
+                authRepo = authRepo,
                 onRegistrationSuccess = {
                     Log.d("MainScreen", "Registration Success, Navigating to Login")
-                    // Після успішної реєстрації, можливо, переходимо до екрану входу
                     currentAppState = AppState.Login
                 },
                 onBack = {
@@ -105,7 +93,7 @@ fun MainScreen(
             )
         }
         AppState.AuthenticatedMain -> {
-            AuthenticatedMainScreen( // <-- Тепер імпортується
+            AuthenticatedMainScreen(
                 onTranslateClick = {
                     Log.d("MainScreen", "Navigating to Translate")
                     currentAppState = AppState.AuthenticatedTranslate
@@ -120,15 +108,15 @@ fun MainScreen(
                 },
                 onLogoutClick = {
                     Log.d("MainScreen", "Logging out")
-                    authRepo.logout() // Викликаємо метод виходу з AuthRepo
-                    currentAppState = AppState.UnauthenticatedChoice // Після виходу переходимо до вибору
+                    authRepo.logout()
+                    currentAppState = AppState.UnauthenticatedChoice
                 }
             )
         }
         AppState.AuthenticatedTranslate -> {
-            TranslateScreen( // <-- Тепер імпортується
-                firebaseRepo = firebaseRepo, // Передаємо залежність
-                translationRepo = translationRepo, // Передаємо залежність
+            TranslateScreen(
+                firebaseRepo = firebaseRepo,
+                translationRepo = translationRepo,
                 onBack = {
                     Log.d("MainScreen", "Translate Back, Navigating to AuthenticatedMain")
                     currentAppState = AppState.AuthenticatedMain
@@ -136,8 +124,8 @@ fun MainScreen(
             )
         }
         AppState.AuthenticatedPractice -> {
-            PracticeScreen( // <-- Тепер імпортується
-                practiceRepo = practiceRepo, // Передаємо залежність
+            PracticeScreen(
+                practiceRepo = practiceRepo,
                 onBack = {
                     Log.d("MainScreen", "Practice Back, Navigating to AuthenticatedMain")
                     currentAppState = AppState.AuthenticatedMain
@@ -145,14 +133,11 @@ fun MainScreen(
             )
         }
         AppState.AuthenticatedWordList -> {
-            WordListScreen( // <-- Тепер імпортується
-                repository = firebaseRepo, // Передаємо залежність
+            WordListScreen(
+                repository = firebaseRepo,
                 onWordEdit = { wordId ->
                     Log.d("MainScreen", "Attempt to edit word: $wordId")
-                    // TODO: Реалізуйте перехід на екран редагування
-                    // Наприклад: currentAppState = AppState.AuthenticatedEditWord(wordId)
-                    // Для прикладу, повертаємось назад:
-                    currentAppState = AppState.AuthenticatedMain // Тимчасово
+                    currentAppState = AppState.AuthenticatedMain
                 },
                 onBack = {
                     Log.d("MainScreen", "WordList Back, Navigating to AuthenticatedMain")
@@ -160,16 +145,6 @@ fun MainScreen(
                 }
             )
         }
-        // TODO: Додати кейс для редагування слова
-        /*
-        is AppState.AuthenticatedEditWord -> {
-            EditWordScreen(
-                wordId = currentAppState.wordId, // Передаємо ID слова
-                repository = firebaseRepo, // Передаємо репозиторій
-                onSaveSuccess = { currentAppState = AppState.AuthenticatedWordList }, // Повернутись до списку після збереження
-                onBack = { currentAppState = AppState.AuthenticatedWordList } // Повернутись до списку без збереження
-            )
-        }
-        */
+
     }
 }

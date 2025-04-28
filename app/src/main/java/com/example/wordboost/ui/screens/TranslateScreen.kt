@@ -19,13 +19,12 @@ import com.example.wordboost.viewmodel.TranslateViewModelFactory
 // Імпорт репозиторіїв (для Factory)
 import com.example.wordboost.data.firebase.FirebaseRepository
 import com.example.wordboost.data.repository.TranslationRepository
-// Імпорт CustomGroupDialog з presentation.ui.components
 import com.example.wordboost.ui.components.CustomGroupDialog
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.ui.res.painterResource
-import androidx.compose.runtime.collectAsState // Для StateFlow
+import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.launch
 
 
@@ -36,12 +35,10 @@ fun TranslateScreen(
     translationRepo: TranslationRepository,
     onBack: () -> Unit
 ) {
-    // Отримуємо ViewModel за допомогою Factory
     val viewModel: TranslateViewModel = viewModel(
         factory = TranslateViewModelFactory(firebaseRepo, translationRepo)
     )
 
-    // Спостерігаємо за станом з ViewModel (StateFlow)
     val ukText by viewModel.ukText.collectAsState()
     val enText by viewModel.enText.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
@@ -51,22 +48,18 @@ fun TranslateScreen(
     val isLoading by viewModel.isLoading.collectAsState()
 
 
-    // Обробник системної кнопки "Назад"
     BackHandler(enabled = true) { onBack() }
 
-    // Показати Snackbar при отриманні повідомлення про статус
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(statusMessage) {
         statusMessage?.let { message ->
             coroutineScope.launch {
-                // Показуємо Snackbar
                 snackbarHostState.showSnackbar(
                     message = message,
                     duration = SnackbarDuration.Short
                 )
-                // Очищаємо повідомлення у ViewModel після показу
                 viewModel.clearStatusMessage()
             }
         }
@@ -83,15 +76,13 @@ fun TranslateScreen(
                     }
                 },
                 actions = {
-                    // Іконка активна, тільки коли обидва поля заповнені
                     val canShowGroupIcon = ukText.isNotBlank() && enText.isNotBlank()
 
                     IconButton(
                         onClick = {
                             if (canShowGroupIcon) {
-                                viewModel.showGroupDialog() // Викликаємо функцію ViewModel
+                                viewModel.showGroupDialog()
                             } else {
-                                // Викликаємо функцію ViewModel для встановлення повідомлення
                                 viewModel.setStatusMessage("Заповніть обидва поля для вибору групи")
                             }
                         },
@@ -116,23 +107,19 @@ fun TranslateScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Ukrainian input
             OutlinedTextField(
                 value = ukText,
                 onValueChange = { viewModel.setUkText(it) },
                 label = { Text("Українське слово") },
                 keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
                 modifier = Modifier.fillMaxWidth()
-                // visualTransformation не потрібен
             )
 
-            // English input
             OutlinedTextField(
                 value = enText,
                 onValueChange = { viewModel.setEnText(it) },
                 label = { Text("English word") },
                 keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
-                // !!! visualTransformation ВИДАЛЕНО ЗВІДСИ !!!
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -164,11 +151,8 @@ fun TranslateScreen(
                 }
             }
 
-            // Status message (тепер відображається через Snackbar, цей Text більше не потрібен)
-            /* statusMessage?.let { Text(...) } */
-
-        } // Кінець головного Column
-    } // Кінець Scaffold content
+        } 
+    }
 
     // Group selector dialog
     if (showGroupDialog) {

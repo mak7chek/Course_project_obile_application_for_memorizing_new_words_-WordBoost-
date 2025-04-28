@@ -8,7 +8,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-// Визначаємо можливі події реєстрації для одноразової обробки UI
 sealed class RegistrationEvent {
     object Success : RegistrationEvent()
     data class Failure(val message: String?) : RegistrationEvent()
@@ -29,32 +28,27 @@ class RegisterViewModel(private val authRepository: AuthRepository) : ViewModel(
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
-    // Одноразові події (наприклад, для навігації або Snackbar)
     private val _registrationEvent = Channel<RegistrationEvent>()
-    val registrationEvent = _registrationEvent.receiveAsFlow() // UI буде collectAsState цього Flow
+    val registrationEvent = _registrationEvent.receiveAsFlow()
 
-    // Функції, які UI буде викликати у відповідь на дії користувача
     fun setEmail(newEmail: String) {
         _email.value = newEmail
-        _message.value = null // Очищаємо повідомлення при зміні полів
+        _message.value = null
     }
 
     fun setPassword(newPassword: String) {
         _password.value = newPassword
-        _message.value = null // Очищаємо повідомлення при зміні полів
+        _message.value = null
     }
 
     fun registerUser() {
-        // Не запускаємо, якщо вже завантажуємо
         if (_isLoading.value) return
 
         _isLoading.value = true
-        _message.value = null // Скидаємо попередні повідомлення
+        _message.value = null
 
         val currentEmail = _email.value
         val currentPassword = _password.value
-
-        // Валідація перенесена у ViewModel
         if (!isValidEmail(currentEmail)) {
             _message.value = "Невірний формат email"
             _isLoading.value = false
@@ -66,23 +60,19 @@ class RegisterViewModel(private val authRepository: AuthRepository) : ViewModel(
             return
         }
 
-        // Викликаємо репозиторій у coroutine у viewModelScope
         viewModelScope.launch {
             authRepository.registerUser(currentEmail, currentPassword) { success, msg ->
-                _isLoading.value = false // Виключаємо індикатор завантаження
-                _message.value = msg // Встановлюємо повідомлення (успіх або помилка)
+                _isLoading.value = false
+                _message.value = msg
                 if (success) {
-                    // Надсилаємо подію успіху через Channel
                     viewModelScope.launch { _registrationEvent.send(RegistrationEvent.Success) }
                 } else {
-                    // Надсилаємо подію помилки через Channel
                     viewModelScope.launch { _registrationEvent.send(RegistrationEvent.Failure(msg)) }
                 }
             }
         }
     }
 
-    // Функція для очищення повідомлення після того, як UI його відобразив (опціонально, якщо не використовуєте Snackbar)
     fun clearMessage() {
         _message.value = null
     }

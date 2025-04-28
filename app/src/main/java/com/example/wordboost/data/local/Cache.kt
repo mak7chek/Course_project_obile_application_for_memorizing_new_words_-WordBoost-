@@ -10,7 +10,6 @@ data class CacheEntity(
     val timestamp: Long = System.currentTimeMillis()
 )
 
-// Dao та Database залишаються поки без змін на цьому кроці
 @Dao
 interface CacheDao {
     @Query("SELECT * FROM translations WHERE original = :text OR translated = :text LIMIT 1")
@@ -27,7 +26,6 @@ interface CacheDao {
     @Query("UPDATE translations SET timestamp = :newTimestamp WHERE original = :originalText")
     fun updateTimestamp(originalText: String, newTimestamp: Long)
 
-    // !!! Змініть метод очищення для видалення записів старіших за певну відмітку часу !!!
     @Query("DELETE FROM translations WHERE timestamp < :thresholdTime")
     fun clearOldEntries(thresholdTime: Long)
 }

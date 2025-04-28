@@ -9,9 +9,9 @@ data class Word(
     val translation: String = "",
     val dictionaryId: String = "",
     // SM‑2 fields:
-    val repetition: Int = 0,        // кількість послідовних успіхів
-    val easiness: Float = 2.5f,     // коефіцієнт легкості (EF)
-    val interval: Long = 0L,        // останній інтервал (мс)
+    val repetition: Int = 0,
+    val easiness: Float = 2.5f,
+    val interval: Long = 0L,
     val lastReviewed: Long = 0L,
     val nextReview: Long = 0L,
     val status: String = "new"
