@@ -1,6 +1,6 @@
 package com.example.wordboost.ui.screens
 
-// --- Почищені та потрібні імпорти ---
+import androidx.activity.compose.BackHandler // Імпортуємо BackHandler
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -17,38 +17,50 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.example.wordboost.data.model.Word
-import com.example.wordboost.data.repository.PracticeRepository
-import com.example.wordboost.ui.components.PracticeCard // Імпорт твоєї картки
+import androidx.lifecycle.viewmodel.compose.viewModel // Імпортуємо viewModel
+import com.example.wordboost.data.model.Word // Імпортуємо Word
+import com.example.wordboost.data.repository.PracticeRepository // Імпортуємо PracticeRepository
+// Імпортуємо ViewModel та Factory
+import com.example.wordboost.viewmodel.PracticeViewModel
+import com.example.wordboost.viewmodel.PracticeViewModelFactory
+// Імпортуємо компоненти
+import com.example.wordboost.ui.components.PracticeCard
+
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
-import kotlin.random.Random // Потрібно для isReverse
+// import kotlin.random.Random // Random тепер використовується у ViewModel
 
-// --- Імпорти для кнопки Назад та BackHandler ---
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.activity.compose.BackHandler // !!! Додайте цей імпорт !!!
+import androidx.compose.material.icons.automirrored.filled.ArrowBack // Для Back button
+import androidx.compose.ui.text.style.TextAlign
 
 
-// Залишаємо enum тут або виносимо в окремий файл
 enum class DragAnchors {
     Start,
     Know,
     DontKnow
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class) // Додано ExperimentalFoundationApi
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun PracticeScreen(practiceRepo: PracticeRepository, onBack: () -> Unit) { // onBack лямбда вже є
-    var words by remember { mutableStateOf<List<Word>>(emptyList()) }
-    var currentIndex by remember { mutableStateOf(0) }
-    var isFlipped by remember { mutableStateOf(false) }
-    // Початкове значення isReverse встановлюється в LaunchedEffect
-    var isReverse by remember { mutableStateOf(false) }
-    var statusMessage by remember { mutableStateOf<String?>(null) }
-    val coroutineScope = rememberCoroutineScope() // Додано, якщо був відсутній
+fun PracticeScreen(
+    practiceRepo: PracticeRepository, // Отримуємо як залежність для Factory ViewModel
+    onBack: () -> Unit // Колбек для кнопки "Назад"
+) {
+    // Отримуємо ViewModel за допомогою Factory
+    val viewModel: PracticeViewModel = viewModel(factory = PracticeViewModelFactory(practiceRepo))
 
-    // --- Стан для свайпу ---
+    // Спостерігаємо за станом з ViewModel
+    val words by viewModel.words.collectAsState()
+    val currentIndex by viewModel.currentIndex.collectAsState()
+    val isFlipped by viewModel.isFlipped.collectAsState()
+    val isReverse by viewModel.isReverse.collectAsState()
+    val statusMessage by viewModel.statusMessage.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+
+
+    // UI-специфічний стан та логіка для свайпу залишаються тут
+    val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
     val defaultActionSize = 100.dp // Відстань для спрацювання дії свайпу
     val actionSizePx = with(density) { defaultActionSize.toPx() }
@@ -56,48 +68,13 @@ fun PracticeScreen(practiceRepo: PracticeRepository, onBack: () -> Unit) { // on
     val anchoredDraggableState = remember {
         AnchoredDraggableState<DragAnchors>(
             initialValue = DragAnchors.Start,
-            anchors = DraggableAnchors<DragAnchors> { DragAnchors.Start at 0f }, // Починаємо тільки зі Start
+            // Якорі оновлюються в LaunchedEffect
+            anchors = DraggableAnchors<DragAnchors> { DragAnchors.Start at 0f },
             positionalThreshold = { distance: Float -> distance * 0.5f },
             velocityThreshold = { with(density) { 100.dp.toPx() } },
             snapAnimationSpec = tween(),
             decayAnimationSpec = exponentialDecay()
         )
-    }
-
-    // --- Обробник результату свайпу та переходу до наступного слова ---
-    val currentMoveToNextWord by rememberUpdatedState { rezalt: Int -> // Перейменовано параметр з known на rezalt (0 або 5)
-        if (words.isEmpty()) return@rememberUpdatedState
-        val wordToUpdate = words.getOrNull(currentIndex) ?: return@rememberUpdatedState
-        // Використовуємо rezalt (0 або 5) прямо тут
-
-        practiceRepo.updateWordAfterPractice(wordToUpdate,rezalt) {
-            statusMessage = if (rezalt == 5) "Чудово!" else "Не біда, вивчимо!" // Оновлено текст статусу
-            val nextIndex = if (words.isNotEmpty()) (currentIndex + 1) % words.size else 0
-            currentIndex = nextIndex
-            isFlipped = false // Завжди скидаємо перевертання
-            isReverse = Random.nextBoolean() // Встановлюємо новий рандомний реверс
-            coroutineScope.launch {
-                // Скидаємо якорі та позицію для нової картки
-                anchoredDraggableState.updateAnchors(DraggableAnchors<DragAnchors> { DragAnchors.Start at 0f })
-                anchoredDraggableState.snapTo(DragAnchors.Start)
-            }
-        }
-    }
-
-    // --- Завантаження слів та початкове скидання стану ---
-    LaunchedEffect(Unit) {
-        practiceRepo.getWordsForPractice { fetchedWords ->
-            words = fetchedWords
-            currentIndex = 0
-            isFlipped = false
-            statusMessage = null
-            isReverse = Random.nextBoolean() // Початкове значення
-            // Скидання стану свайпу
-            coroutineScope.launch {
-                anchoredDraggableState.updateAnchors(DraggableAnchors<DragAnchors> { DragAnchors.Start at 0f })
-                anchoredDraggableState.snapTo(DragAnchors.Start)
-            }
-        }
     }
 
     // --- Ефект для оновлення якорів свайпу залежно від isFlipped ---
@@ -106,7 +83,7 @@ fun PracticeScreen(practiceRepo: PracticeRepository, onBack: () -> Unit) { // on
             DraggableAnchors<DragAnchors> {
                 DragAnchors.Start at 0f
                 DragAnchors.Know at actionSizePx
-                DragAnchors.DontKnow at -actionSizePx
+                DragAnchors.DontKnow at -actionSizePx // <-- Коректний напрямок для "Не пам'ятаю"
             }
         } else {
             DraggableAnchors<DragAnchors> {
@@ -115,67 +92,100 @@ fun PracticeScreen(practiceRepo: PracticeRepository, onBack: () -> Unit) { // on
         }
         anchoredDraggableState.updateAnchors(newAnchors)
 
-        // Якщо картку перевернули назад і вона не в центрі, повернемо її.
+        // Якщо картку перевернули назад І вона не в центрі, повернемо її.
+        // Це також спрацює, коли ViewModel змінює isFlipped на false для нової картки
         if (!isFlipped && anchoredDraggableState.currentValue != DragAnchors.Start) {
             coroutineScope.launch { anchoredDraggableState.snapTo(DragAnchors.Start) }
         }
     }
 
     // --- Ефект для реагування на завершення свайпу ---
-    // Цей ефект має бути *за межами* будь-яких `if`, щоб завжди слухати зміни стану
+    // Цей ефект викликає функцію ViewModel після завершення анімації свайпу
     LaunchedEffect(anchoredDraggableState.targetValue) {
         val target = anchoredDraggableState.targetValue
         // Діємо тільки якщо картка була перевернута І свайпнута до кінця
+        // ViewModel змінює isFlipped, що скидає цей ефект для нової картки
         if (isFlipped) {
             when (target) {
-                DragAnchors.Know -> currentMoveToNextWord(5) // Передаємо 5 для "Пам'ятаю"
-                DragAnchors.DontKnow -> currentMoveToNextWord(0) // Передаємо 0 для "Не пам'ятаю"
+                DragAnchors.Know -> {
+                    // Картка свайпнута вправо
+                    viewModel.processSwipeResult(5) // Передаємо результат "Пам'ятаю"
+                    // Не скидаємо тут UI стан, це зробить ViewModel
+                }
+                DragAnchors.DontKnow -> {
+                    // Картка свайпнута вліво
+                    viewModel.processSwipeResult(0) // Передаємо результат "Не пам'ятаю"
+                    // Не скидаємо тут UI стан, це зробить ViewModel
+                }
                 DragAnchors.Start -> { /* Нічого не робити при поверненні до старту */ }
             }
         }
     }
 
-    // !!! Додаємо обробник системного свайпу назад (або натискання кнопки Назад) !!!
-    BackHandler(enabled = true) { // enabled = true означає, що обробник завжди активний
-        onBack() // Викликаємо зовнішню лямбду onBack
+    // Обробник системної кнопки "Назад"
+    BackHandler(enabled = true) { onBack() }
+
+
+    // Показати Snackbar при отриманні повідомлення про статус
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScopeSnackbar = rememberCoroutineScope() // Окремий scope для Snackbar
+
+    LaunchedEffect(statusMessage) {
+        statusMessage?.let { message ->
+            coroutineScopeSnackbar.launch {
+                snackbarHostState.showSnackbar(
+                    message = message,
+                    duration = SnackbarDuration.Short
+                )
+                viewModel.clearStatusMessage() // Очищаємо повідомлення після показу
+            }
+        }
     }
 
 
     Scaffold(
         topBar = {
-            TopAppBar( // !!! Змінюємо на TopAppBar для додавання navigationIcon !!!
-                title = { Text("Практика слів") }, // Залишаємо заголовок
-                navigationIcon = { // !!! Додаємо navigationIcon слот для кнопки Назад !!!
-                    IconButton(onClick = onBack) { // Кнопка Назад, яка викликає onBack
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+            TopAppBar(
+                title = { Text("Практика слів") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) } // Додаємо SnackbarHost
     ) { padding ->
         Box(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp), // Загальний відступ для Box
+                .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
 
-            if (words.isEmpty()) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center)) // Краще індикатор по центру
-            } else {
+            if (isLoading && words.isEmpty()) { // Показуємо індикатор, коли завантажуємо і список порожній
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            } else if (words.isEmpty() && !isLoading) { // Якщо список порожній після завантаження
+                Text("Слів для практики поки немає.\nДодайте слова або змініть статус існуючих.",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+            else { // Якщо слова є
                 words.getOrNull(currentIndex)?.let { word ->
 
                     // --- Застосовуємо модифікатори свайпу до PracticeCard ---
                     PracticeCard(
-                        word = word,
-                        isFlipped = isFlipped,
-                        isReverse = isReverse,
-                        onFlip = { isFlipped = !isFlipped },
+                        word = word, // Дані з ViewModel
+                        isFlipped = isFlipped, // Стан з ViewModel
+                        isReverse = isReverse, // Стан з ViewModel
+                        onFlip = { viewModel.flipCard() }, // Викликаємо функцію ViewModel
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1.5f)
-                            // Додаємо зміщення на основі стану свайпу
+                            // Застосовуємо зміщення від стану свайпу
                             .offset {
                                 IntOffset(
                                     x = anchoredDraggableState
@@ -184,50 +194,43 @@ fun PracticeScreen(practiceRepo: PracticeRepository, onBack: () -> Unit) { // on
                                     y = 0
                                 )
                             }
-                            // Додаємо сам обробник свайпів
+                            // Додаємо обробник свайпів
                             .anchoredDraggable(
                                 state = anchoredDraggableState,
                                 orientation = Orientation.Horizontal,
                                 enabled = isFlipped // Свайп можливий ТІЛЬКИ коли картка перевернута
                             )
                     )
-                } ?: Text("Помилка: Не вдалося отримати слово", modifier = Modifier.align(Alignment.Center)) // На випадок проблеми з індексом - по центру
+                } // Текст "Не вдалося отримати слово" тепер обробляється через statusMessage Snackbar
+            }
 
-                // Прогрес (з виправленим обчисленням)
-                if (words.isNotEmpty()) {
-                    // Перемістимо індикатор прогресу і лічильник всередину головного Box,
-                    // щоб вони розміщувалися відносно нього, а не відносно картки.
+            // Прогрес та лічильник
+            if (words.isNotEmpty() && !isLoading) { // Показуємо, тільки якщо є слова і не завантажуємо
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .padding(top = 0.dp) // Невеликий відступ зверху
+                ) {
                     LinearProgressIndicator(
-                        // --- ВИПРАВЛЕНО: Використовуємо toFloat ---
                         progress = { (currentIndex + 1).toFloat() / words.size.toFloat() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.TopCenter) // Вирівнюємо зверху по центру Box
-                            .padding(top = 0.dp) // Можна залишити 0 або додати невеликий відступ
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    Text( // Додамо лічильник слів
-                        text = "${currentIndex + 1} / ${words.size}",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd) // Вирівнюємо зверху справа Box
-                            .padding(top = 4.dp, end = 4.dp) // Відступи справа та зверху
-                    )
-                }
-
-
-
-                // Повідомлення про статус - залишаємо його внизу, але можемо додати відступ
-                statusMessage?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter) // Вирівнюємо знизу по центру Box
-                            .padding(bottom = 16.dp) // Відступ знизу
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.End // Вирівнюємо лічильник справа
+                    ) {
+                        Text( // Лічильник слів
+                            text = "${currentIndex + 1} / ${words.size}",
+                            style = MaterialTheme.typography.bodySmall,
+                            // modifier = Modifier.align(Alignment.TopEnd) // Не тут, бо ми в Column
+                        )
+                    }
                 }
             }
 
+            // Повідомлення про статус (тепер відображається через Snackbar)
+            /* statusMessage?.let { Text(...) } */
         }
     }
 }

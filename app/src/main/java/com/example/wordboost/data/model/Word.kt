@@ -1,7 +1,10 @@
 package com.example.wordboost.data.model
 
+import com.google.firebase.firestore.DocumentId
+
 data class Word(
-    val id: String = "",
+    @DocumentId
+    var id: String = "",
     val text: String = "",
     val translation: String = "",
     val dictionaryId: String = "",

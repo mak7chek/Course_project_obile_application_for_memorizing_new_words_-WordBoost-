@@ -2,6 +2,7 @@
 package com.example.wordboost.data.firebase
 
 import com.example.wordboost.data.model.Word
+import com.example.wordboost.data.model.Group
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -36,7 +37,6 @@ class FirebaseRepository {
                 callback(emptyList())
             }
     }
-
     fun getWordObject(text: String, callback: (Word?) -> Unit) {
         wordsCollection
             .whereEqualTo("text", text)
@@ -79,12 +79,36 @@ class FirebaseRepository {
     }
 
     fun saveWord(word: Word, callback: (Boolean) -> Unit = {}) {
+        if (word.id.isBlank()) {
+            callback(false)
+            return
+        }
         wordsCollection.document(word.id)
             .set(word, SetOptions.merge())
             .addOnSuccessListener { callback(true) }
             .addOnFailureListener { callback(false) }
     }
-
+    fun deleteWord(wordId: String, callback: (Boolean) -> Unit) {
+        wordsCollection.document(wordId)
+            .delete()
+            .addOnSuccessListener { callback(true) }
+            .addOnFailureListener { callback(false) }
+    }
+    fun updateWord(word: Word, callback: (Boolean) -> Unit = {}) {
+        saveWord(word, callback)
+    }
+    fun getAllWords(callback: (List<Word>) -> Unit) {
+        wordsCollection
+            .get()
+            .addOnSuccessListener { result ->
+                // Завдяки @DocumentId, поле 'id' об'єкта Word буде заповнено автоматично
+                val words = result.documents.mapNotNull { it.toObject(Word::class.java) }
+                callback(words)
+            }
+            .addOnFailureListener {
+                callback(emptyList())
+            }
+    }
     fun getGroups(callback: (List<Group>) -> Unit) {
         groupsCollection
             .get()
@@ -124,10 +148,4 @@ class FirebaseRepository {
     }
 }
 
-/**
- * Модель групи
- */
-data class Group(
-    val id: String = "",
-    val name: String = ""
-)
+

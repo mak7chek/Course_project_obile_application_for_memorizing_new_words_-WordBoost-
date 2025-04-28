@@ -8,25 +8,57 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.wordboost.data.firebase.AuthRepository
-import com.example.wordboost.ui.components.isValidEmail
-import com.example.wordboost.ui.components.isValidPassword
+import androidx.lifecycle.viewmodel.compose.viewModel // Імпортуємо функцію viewModel
+import com.example.wordboost.data.firebase.AuthRepository // Імпортуємо AuthRepository
+// Імпортуємо ViewModel та Factory з нових пакетів
+import com.example.wordboost.viewmodel.AuthViewModelFactory
+import com.example.wordboost.viewmodel.LoginViewModel
+import com.example.wordboost.viewmodel.LoginEvent
+
 
 @Composable
-fun LoginScreen(authRepo: AuthRepository = AuthRepository(), onSuccess: () -> Unit, onBack: () -> Unit) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var message by remember { mutableStateOf<String?>(null) }
-    var showVerifyButton by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) } // Стан для індикатора завантаження
+fun LoginScreen(
+    authRepo: AuthRepository, // Отримуємо репозиторій як залежність для Factory
+    onSuccess: () -> Unit, // Колбек для навігації після успіху
+    onBack: () -> Unit // Колбек для кнопки "Назад"
+) {
+    // Отримуємо ViewModel за допомогою Factory
+    val viewModel: LoginViewModel = viewModel(factory = AuthViewModelFactory(authRepo))
+
+    // Спостерігаємо за станом з ViewModel
+    val email by viewModel.email.collectAsState()
+    val password by viewModel.password.collectAsState()
+    val message by viewModel.message.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val showVerifyButton by viewModel.showVerifyButton.collectAsState()
+
+    // Обробляємо одноразові події з ViewModel (наприклад, для навігації)
+    LaunchedEffect(Unit) {
+        viewModel.loginEvent.collect { event ->
+            when (event) {
+                is LoginEvent.Success -> {
+                    onSuccess() // Викликаємо колбек для навігації
+                    // Можна показати Snackbar з повідомленням про успіх тут
+                }
+                is LoginEvent.Failure -> {
+                    // Повідомлення про помилку вже встановлене у _message ViewModel
+                    // Можна додатково показати Snackbar, якщо потрібно
+                }
+                is LoginEvent.ShowVerificationPrompt -> {
+                    // Повідомлення та кнопка вже встановлені у відповідних StateFlow
+                    // Можна показати Snackbar з додатковою інформацією, якщо потрібно
+                }
+            }
+        }
+    }
 
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
-        verticalArrangement = Arrangement.Center, // Вирівнюємо по центру вертикально
-        horizontalAlignment = Alignment.CenterHorizontally // Вирівнюємо по центру горизонтально
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             "Вхід до WordBoost",
@@ -37,78 +69,51 @@ fun LoginScreen(authRepo: AuthRepository = AuthRepository(), onSuccess: () -> Un
 
         OutlinedTextField(
             value = email,
-            onValueChange = { email = it },
+            onValueChange = { viewModel.setEmail(it) }, // Передаємо зміни у ViewModel
             label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth(0.9f) // Поле займає 90% ширини
+            modifier = Modifier.fillMaxWidth(0.9f)
         )
-        Spacer(Modifier.height(16.dp)) // Збільшили відступ
+        Spacer(Modifier.height(16.dp))
 
         OutlinedTextField(
             value = password,
-            onValueChange = { password = it },
+            onValueChange = { viewModel.setPassword(it) }, // Передаємо зміни у ViewModel
             label = { Text("Пароль") },
-            visualTransformation = PasswordVisualTransformation(), // Приховуємо пароль
-            modifier = Modifier.fillMaxWidth(0.9f) // Поле займає 90% ширини
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(0.9f)
         )
-        Spacer(Modifier.height(24.dp)) // Збільшили відступ
+        Spacer(Modifier.height(24.dp))
 
         Button(
-            onClick = {
-                if (isLoading) return@Button // Забороняємо повторне натискання під час завантаження
-                isLoading = true // Включаємо індикатор завантаження
-                message = null // Скидаємо попередні повідомлення
-                showVerifyButton = false
-
-                if (!isValidEmail(email)) {
-                    message = "Невірний формат email"
-                    isLoading = false
-                    return@Button
-                }
-                if (!isValidPassword(password)) {
-                    message = "Пароль має містити щонайменше 6 символів"
-                    isLoading = false
-                    return@Button
-                }
-
-                authRepo.loginUser(email, password) { success, msg ->
-                    isLoading = false // Виключаємо індикатор завантаження
-                    if (success) {
-                        onSuccess() // Переходимо далі
-                    } else {
-                        message = msg
-                        showVerifyButton = msg?.contains("email адресу") == true
-                    }
-                }
-            },
+            onClick = { viewModel.loginUser() }, // Викликаємо функцію входу у ViewModel
             modifier = Modifier.fillMaxWidth(0.8f),
-            enabled = !isLoading // Вимикаємо кнопку під час завантаження
+            enabled = !isLoading // Кнопка вимкнена під час завантаження
         ) {
             if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary) // Маленький індикатор в кнопці
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
             } else {
                 Text("Увійти")
             }
         }
 
+        // Кнопка "Надіслати лист повторно" тепер контролюється ViewModel
         if (showVerifyButton) {
             Spacer(Modifier.height(16.dp))
             Button(
-                onClick = {
-                    authRepo.sendEmailVerification { success, resultMsg ->
-                        message = resultMsg
-                    }
-                },
+                onClick = { viewModel.sendVerificationEmail() }, // Викликаємо функцію ViewModel
                 modifier = Modifier.fillMaxWidth(0.8f)
             ) {
                 Text("Надіслати лист повторно")
             }
         }
 
+        // Повідомлення контролюється ViewModel
         message?.let {
             Spacer(Modifier.height(16.dp))
             Text(
                 it,
-                color = if (showVerifyButton) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, // Колір повідомлення залежить від типу
+                // Колір повідомлення: зелений для успіху/верифікації, червоний для помилки
+                color = if (showVerifyButton || it.contains("успішно", ignoreCase = true) || it.contains("надіслано", ignoreCase = true)) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(0.9f)
             )
@@ -116,7 +121,6 @@ fun LoginScreen(authRepo: AuthRepository = AuthRepository(), onSuccess: () -> Un
 
         Spacer(Modifier.height(24.dp))
 
-        // Кнопка назад
         OutlinedButton(
             onClick = onBack,
             modifier = Modifier.fillMaxWidth(0.8f)

@@ -17,7 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.example.wordboost.data.firebase.Group
+import com.example.wordboost.data.model.Group
 import com.example.wordboost.data.firebase.FirebaseRepository // Залежність, якщо використовується всередині
 
 @Composable
