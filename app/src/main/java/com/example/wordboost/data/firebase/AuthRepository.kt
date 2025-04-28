@@ -9,7 +9,6 @@ import com.google.firebase.auth.FirebaseUser
 class AuthRepository {
 
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
-
     /**
      * Реєструє нового користувача за допомогою email та пароля.
      * Після успішної реєстрації автоматично намагається надіслати лист верифікації.

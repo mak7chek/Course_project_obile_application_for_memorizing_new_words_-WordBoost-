@@ -8,9 +8,6 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.auth.FirebaseAuth
 
-/**
- * Репозиторій для роботи зі словами та групами у Firestore, прив'язаними до користувача
- */
 class FirebaseRepository {
 
     private val db = Firebase.firestore
@@ -147,5 +144,3 @@ class FirebaseRepository {
             .addOnFailureListener { callback(false) }
     }
 }
-
-

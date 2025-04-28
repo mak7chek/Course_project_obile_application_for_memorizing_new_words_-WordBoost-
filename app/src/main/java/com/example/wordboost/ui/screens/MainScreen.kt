@@ -5,28 +5,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 
-// Імпортуємо репозиторії (вони будуть передаватися як параметри)
 import com.example.wordboost.data.firebase.AuthRepository
 import com.example.wordboost.data.firebase.FirebaseRepository
 import com.example.wordboost.data.repository.PracticeRepository
 import com.example.wordboost.data.repository.TranslationRepository
 
-// Імпортуємо ваші інші Composable екрани з ЦЬОГО Ж пакету (presentation.ui.screens)
-// Розкоментуйте та переконайтесь, що package назва правильна
-import com.example.wordboost.ui.screens.AuthChoiceScreen
-import com.example.wordboost.ui.screens.LoginScreen
-import com.example.wordboost.ui.screens.RegisterScreen
-import com.example.wordboost.ui.screens.AuthenticatedMainScreen
-import com.example.wordboost.ui.screens.TranslateScreen
-import com.example.wordboost.ui.screens.PracticeScreen
-import com.example.wordboost.ui.screens.WordListScreen
 
 
-// TODO: Додайте імпорт для вашої теми, якщо вона використовується в цьому файлі
-// import com.example.wordboost.ui.theme.Course_project_obile_application_for_memorizing_new_words_WordBoostTheme
 
 
 // Enum для керування станом програми (перемикання екранів)
@@ -187,4 +173,3 @@ fun MainScreen(
         */
     }
 }
-

@@ -177,7 +177,6 @@ class WordListViewModel(private val repository: FirebaseRepository) : ViewModel(
             }
         }
     }
-
     // Функція-заглушка для дії "Редагувати". UI обробляє навігацію.
     fun onEditWordClicked(word: Word) {
         // UI має обробити навігацію

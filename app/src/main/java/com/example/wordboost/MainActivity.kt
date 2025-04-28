@@ -29,7 +29,6 @@ class MainActivity : ComponentActivity() {
     private val CACHE_CLEAR_WORK_NAME = "CacheClearWork"
     private val REPEAT_INTERVAL_DAYS: Long = 6
 
-    // Відкладаємо ініціалізацію залежностей до onCreate
     private lateinit var firebaseRepo: FirebaseRepository
     private lateinit var authRepo: AuthRepository
     private lateinit var practiceRepo: PracticeRepository
@@ -40,17 +39,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        FirebaseApp.initializeApp(this) // Переконайтеся, що Firebase ініціалізовано
+        FirebaseApp.initializeApp(this)
         scheduleCacheClearWork()
 
-        // Ініціалізуємо всі репозиторії та базу даних тут, в onCreate
         firebaseRepo = FirebaseRepository()
         authRepo = AuthRepository()
         practiceRepo = PracticeRepository(firebaseRepo)
 
-        // Ініціалізація бази даних, перекладач та репозиторію перекладу
         appDatabase = Room.databaseBuilder(applicationContext, AppDatabase::class.java, "wordboost-db")
-            .fallbackToDestructiveMigration(true) // Для простих міграцій
+            .fallbackToDestructiveMigration(true)
             .build()
         val cacheDao = appDatabase.cacheDao()
 
@@ -62,7 +59,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             Course_project_obile_application_for_memorizing_new_words_WordBoostTheme { // Ваша тема
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    // Викликаємо MainScreen, передаючи йому всі створені залежності
                     MainScreen(
                         authRepo = authRepo,
                         practiceRepo = practiceRepo,
