@@ -7,9 +7,7 @@ import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.auth.FirebaseAuth
-
 class FirebaseRepository {
-
     private val db = Firebase.firestore
     private val userId: String
         get() = FirebaseAuth.getInstance().currentUser?.uid ?: "testUser"

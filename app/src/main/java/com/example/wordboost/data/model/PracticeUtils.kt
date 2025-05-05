@@ -19,18 +19,18 @@ object PracticeUtils {
         )
         val newRep = if (quality < 3) 0 else oldRep + 1
         val newInterval: Long = when (newRep) {
-            0 -> 1 * 60 * 1000L             // 1 хв
-            1 -> 1 * 60 * 1000L             // 1 хв
-            2 -> 6 * 60 * 1000L             // 6 хв
+            0 -> 1 * 60 * 1000L                  // 1 хв
+            1 -> 1 * 60 * 1000L                 // 1 хв
+            2 -> 6 * 60 * 1000L                // 6 хв
             else -> (oldInt * newEF).toLong() // далі EF * oldInt
         }
         return Triple(newRep, newEF, newInterval)
     }
 
     fun determineStatus(repetition: Int): String = when {
-        repetition == 0      -> "new"
-        repetition == 1      -> "learning"
+        repetition == 0            -> "new"
+        repetition == 1            -> "learning"
         repetition in 2..4   -> "review"
-        else                  -> "mastered"
+        else                       -> "mastered"
     }
 }

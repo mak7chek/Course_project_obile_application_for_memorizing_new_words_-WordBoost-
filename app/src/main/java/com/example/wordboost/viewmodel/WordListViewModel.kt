@@ -8,7 +8,7 @@ import com.example.wordboost.data.model.Word
 import com.example.wordboost.data.model.PracticeUtils
 import java.text.SimpleDateFormat // Імпорт SimpleDateFormat
 import java.util.* // Імпорт Date, Locale
-
+import com.example.wordboost.data.tts.TextToSpeechService
 
 // Дата-клас для відображення слова у списку
 data class WordDisplayItem(
@@ -16,7 +16,10 @@ data class WordDisplayItem(
     val groupName: String?
 )
 
-class WordListViewModel(private val repository: FirebaseRepository) : ViewModel() {
+class WordListViewModel(
+    private val repository: FirebaseRepository,
+    private val ttsService: TextToSpeechService
+) : ViewModel() {
 
     private val _allWords = MutableLiveData<List<Word>>(emptyList())
     private val _displayedWords = MutableLiveData<List<WordDisplayItem>>(emptyList())
@@ -163,7 +166,14 @@ class WordListViewModel(private val repository: FirebaseRepository) : ViewModel(
             "Наступне: ${formatter.format(date)}"
         }
     }
-
+    fun playWordSound(word: Word) {
+        ttsService.speak(word.translation)
+    }
+    override fun onCleared() {
+        super.onCleared()
+        // ttsService.shutdown() // Не викликайте shutdown тут! Service живе довше за ViewModel
+        ttsService.stop() // Зупиняємо будь-яке поточне озвучування при очищенні ViewModel
+    }
     // Очищає повідомлення про помилку/статус
     fun clearErrorMessage() {
         _errorMessage.value = null

@@ -16,7 +16,6 @@ class TranslationRepository(
     private val cacheDao: CacheDao,
     private val realTranslator: Translator
 ) {
-
     fun translate(text: String, targetLang: String, onResult: (String?) -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
             firebaseRepo.getTranslation(text) { firebaseResult ->

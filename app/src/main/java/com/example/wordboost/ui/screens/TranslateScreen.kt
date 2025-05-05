@@ -25,6 +25,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
 import kotlinx.coroutines.launch
 
 
@@ -88,10 +90,11 @@ fun TranslateScreen(
                         },
                         enabled = canShowGroupIcon
                     ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.folder_custom_icon),
+                        Icon(
+                            imageVector = ImageVector.vectorResource(id  = R.drawable.folder_custom_icon),
                             contentDescription = "Вибрати групу",
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(24.dp),
+                            tint = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
