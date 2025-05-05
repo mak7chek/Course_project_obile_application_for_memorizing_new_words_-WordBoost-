@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.wordboost.data.repository.PracticeRepository
+import com.example.wordboost.data.tts.TextToSpeechService
 // Імпортуємо ViewModel та Factory
 import com.example.wordboost.viewmodel.PracticeViewModel
 import com.example.wordboost.viewmodel.PracticeViewModelFactory
@@ -44,9 +45,10 @@ enum class DragAnchors {
 @Composable
 fun PracticeScreen(
     practiceRepo: PracticeRepository,
+    ttsService: TextToSpeechService,
     onBack: () -> Unit
 ) {
-    val viewModel: PracticeViewModel = viewModel(factory = PracticeViewModelFactory(practiceRepo))
+    val viewModel: PracticeViewModel = viewModel(factory = PracticeViewModelFactory(practiceRepo,ttsService))
 
     val words by viewModel.words.collectAsState()
     val currentIndex by viewModel.currentIndex.collectAsState()
@@ -160,14 +162,13 @@ fun PracticeScreen(
                         isFlipped = isFlipped,
                         isReverse = isReverse,
                         onFlip = { viewModel.flipCard() },
+                        onReplaySound = { wordToSpeak -> viewModel.replayWordSound(wordToSpeak) }, 
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1.5f)
                             .offset {
                                 IntOffset(
-                                    x = anchoredDraggableState
-                                        .requireOffset()
-                                        .roundToInt(),
+                                    x = anchoredDraggableState.requireOffset().roundToInt(),
                                     y = 0
                                 )
                             }

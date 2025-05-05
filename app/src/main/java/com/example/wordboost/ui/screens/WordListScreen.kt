@@ -15,28 +15,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
+
 import com.example.wordboost.data.firebase.FirebaseRepository
 import com.example.wordboost.data.model.Group
 import com.example.wordboost.data.model.Word
-
+import com.example.wordboost.data.tts.TextToSpeechService
 import com.example.wordboost.viewmodel.WordListViewModel
 import com.example.wordboost.viewmodel.WordListViewModelFactory
-import com.example.wordboost.viewmodel.WordDisplayItem
-
 import com.example.wordboost.ui.components.WordListItem
-
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import kotlinx.coroutines.launch
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WordListScreen(
     repository: FirebaseRepository,
+    ttsService: TextToSpeechService,
     onWordEdit: (wordId: String) -> Unit,
     onBack: () -> Unit
 ) {
-    val viewModel: WordListViewModel = viewModel(factory = WordListViewModelFactory(repository = repository))
+    val viewModel: WordListViewModel = viewModel(factory = WordListViewModelFactory(repository = repository, ttsService = ttsService))
+
     val displayedWords by viewModel.displayedWords.observeAsState(initial = emptyList())
     val groups by viewModel.groups.observeAsState(initial = emptyList())
     val isLoading by viewModel.isLoading.observeAsState(initial = false)
@@ -118,16 +117,14 @@ fun WordListScreen(
                         style = MaterialTheme.typography.headlineSmall
                     )
                 }
-            } else if (displayedWords.isNotEmpty() && !isLoading) { // <-- ВИПРАВЛЕНО ТУТ: ВИКОРИСТОВУЄМО displayedWords
+            }  else if (displayedWords.isNotEmpty() && !isLoading) {
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f),
+                    modifier = Modifier.fillMaxSize().weight(1f),
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
                     items(
                         items = displayedWords,
-                        key = { it.word.id }
+                        key = { it.id } // Використовуємо id з WordDisplayItem
                     ) { item ->
                         WordListItem(
                             item = item,
@@ -135,7 +132,9 @@ fun WordListScreen(
                             onEditClick = { word -> onWordEdit(word.id) },
                             onResetClick = { word -> viewModel.resetWord(word) },
                             onDeleteClick = { word -> viewModel.deleteWord(word.id) },
-                            formatDate = { timestamp -> viewModel.formatNextReviewDate(timestamp) }
+                            formatDate = { timestamp -> viewModel.formatNextReviewDate(timestamp) },
+                            onPlaySound = { word -> viewModel.playWordSound(word) },
+                            wordProgress = item.progress,
                         )
                     }
                 }

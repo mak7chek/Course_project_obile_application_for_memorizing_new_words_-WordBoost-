@@ -1,4 +1,4 @@
-package com.example.wordboost.ui.components
+package com.example.wordboost.ui.components // Ваш пакет
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
@@ -16,7 +16,7 @@ fun CardContent(
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier
+        modifier = modifier // Приймає модифікатор ззовні
             .padding(24.dp)
             .fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,

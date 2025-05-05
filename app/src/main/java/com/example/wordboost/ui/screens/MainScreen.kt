@@ -10,7 +10,7 @@ import com.example.wordboost.data.firebase.AuthRepository
 import com.example.wordboost.data.firebase.FirebaseRepository
 import com.example.wordboost.data.repository.PracticeRepository
 import com.example.wordboost.data.repository.TranslationRepository
-
+import com.example.wordboost.data.tts.TextToSpeechService
 
 
 enum class AppState {
@@ -30,7 +30,8 @@ fun MainScreen(
     authRepo: AuthRepository,
     practiceRepo: PracticeRepository,
     firebaseRepo: FirebaseRepository,
-    translationRepo: TranslationRepository
+    translationRepo: TranslationRepository,
+    ttsService: TextToSpeechService
 ) {
 
     var currentAppState by remember { mutableStateOf<AppState>(AppState.Loading) }
@@ -129,12 +130,14 @@ fun MainScreen(
                 onBack = {
                     Log.d("MainScreen", "Practice Back, Navigating to AuthenticatedMain")
                     currentAppState = AppState.AuthenticatedMain
-                }
+                },
+                ttsService = ttsService
             )
         }
         AppState.AuthenticatedWordList -> {
             WordListScreen(
                 repository = firebaseRepo,
+                ttsService = ttsService,
                 onWordEdit = { wordId ->
                     Log.d("MainScreen", "Attempt to edit word: $wordId")
                     currentAppState = AppState.AuthenticatedMain

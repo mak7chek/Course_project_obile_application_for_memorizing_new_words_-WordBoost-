@@ -8,15 +8,20 @@ import com.example.wordboost.data.model.Word
 import com.example.wordboost.data.model.PracticeUtils
 import java.text.SimpleDateFormat // Імпорт SimpleDateFormat
 import java.util.* // Імпорт Date, Locale
-
-
+import com.example.wordboost.data.tts.TextToSpeechService
 // Дата-клас для відображення слова у списку
 data class WordDisplayItem(
     val word: Word,
-    val groupName: String?
-)
+    val groupName: String?,
+    val progress: Float
+) {
+    val id: String = word.id
+}
 
-class WordListViewModel(private val repository: FirebaseRepository) : ViewModel() {
+class WordListViewModel(
+    private val repository: FirebaseRepository,
+    private val ttsService: TextToSpeechService
+) : ViewModel() {
 
     private val _allWords = MutableLiveData<List<Word>>(emptyList())
     private val _displayedWords = MutableLiveData<List<WordDisplayItem>>(emptyList())
@@ -75,34 +80,34 @@ class WordListViewModel(private val repository: FirebaseRepository) : ViewModel(
 
 
     private fun applyFiltersAndSearch() {
-        val words = _allWords.value ?: emptyList()
-        val groupsById = _groups.value.orEmpty().associateBy { it.id }
+        val currentSearchQuery = searchQuery.value ?: ""
+        val currentGroupFilterId = selectedGroupIdFilter.value
+        val allWords = _allWords.value ?: emptyList()
+        val groups = _groups.value ?: emptyList()
 
-        val filteredWords = words.filter { word ->
-            // Фільтрація за групою
-            val groupMatch = when (_selectedGroupIdFilter.value) {
-                null, "" -> true
-                "no_group_filter" -> word.dictionaryId.isEmpty()
-                else -> word.dictionaryId == _selectedGroupIdFilter.value
+        val filteredWords = allWords.filter { word ->
+            val matchesSearch = currentSearchQuery.isBlank() ||
+                    word.text.contains(currentSearchQuery, ignoreCase = true) ||
+                    word.translation.contains(currentSearchQuery, ignoreCase = true)
+
+            val matchesGroup = when (currentGroupFilterId) {
+                null, "" -> true // Без фільтра або "Усі слова"
+                "no_group_filter" -> word.dictionaryId.isNullOrBlank()
+                else -> word.dictionaryId == currentGroupFilterId
             }
-            val queryMatch = if (currentSearchQuery.isBlank()) {
-                true
-            } else {
-                val lowerCaseQuery = currentSearchQuery.toLowerCase(Locale.ROOT)
-                word.text.toLowerCase(Locale.ROOT).contains(lowerCaseQuery as CharSequence) ||
-                        word.translation.toLowerCase(Locale.ROOT).contains(lowerCaseQuery as CharSequence)
-            }
-            groupMatch && queryMatch
+            matchesSearch && matchesGroup
+        }
+            .sortedBy { it.nextReview }
+
+
+        val displayedItems = filteredWords.map { word ->
+            val groupName = groups.firstOrNull { it.id == word.dictionaryId }?.name
+            val progress = PracticeUtils.calculateProgress(word.repetition, word.interval)
+            WordDisplayItem(word, groupName, progress)
         }
 
-        val displayItems = filteredWords.map { word ->
-            val groupName = groupsById[word.dictionaryId]?.name
-            WordDisplayItem(word = word, groupName = groupName)
-        }
-
-        _displayedWords.value = displayItems
+        _displayedWords.value = displayedItems
     }
-
     fun setSearchQuery(query: String) {
         currentSearchQuery = query // <-- Використання currentSearchQuery
         _searchQuery.value = query
@@ -132,7 +137,7 @@ class WordListViewModel(private val repository: FirebaseRepository) : ViewModel(
 
     fun resetWord(word: Word) {
         val resetWord = word.copy(
-            repetition = 0, easiness = 2.5f, interval = 0L, lastReviewed = 0L, nextReview = System.currentTimeMillis(), status = PracticeUtils.determineStatus(0)
+            repetition = 0, easiness = 2.5f, interval = 0L, lastReviewed = 0L, nextReview = System.currentTimeMillis(), status = PracticeUtils.determineStatus(0,0L)
         )
 
         _isLoading.value = true
@@ -163,7 +168,14 @@ class WordListViewModel(private val repository: FirebaseRepository) : ViewModel(
             "Наступне: ${formatter.format(date)}"
         }
     }
-
+    fun playWordSound(word: Word) {
+        ttsService.speak(word.translation)
+    }
+    override fun onCleared() {
+        super.onCleared()
+        // ttsService.shutdown() // Не викликайте shutdown тут! Service живе довше за ViewModel
+        ttsService.stop() // Зупиняємо будь-яке поточне озвучування при очищенні ViewModel
+    }
     // Очищає повідомлення про помилку/статус
     fun clearErrorMessage() {
         _errorMessage.value = null

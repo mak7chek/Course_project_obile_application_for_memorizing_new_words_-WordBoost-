@@ -19,7 +19,7 @@ class PracticeRepository(private val firebase: FirebaseRepository) {
         )
         val now = System.currentTimeMillis()
         val next = now + interval
-        val status = PracticeUtils.determineStatus(rep)
+        val status = PracticeUtils.determineStatus(rep, interval)
         val updated = word.copy(
             repetition = rep,
             easiness = ef,

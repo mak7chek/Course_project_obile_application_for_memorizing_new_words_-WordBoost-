@@ -23,6 +23,7 @@ import com.example.wordboost.translation.RealTranslator
 import com.example.wordboost.ui.theme.Course_project_obile_application_for_memorizing_new_words_WordBoostTheme
 import com.google.firebase.FirebaseApp
 import java.util.concurrent.TimeUnit
+import com.example.wordboost.data.tts.TextToSpeechService
 
 class MainActivity : ComponentActivity() {
 
@@ -35,7 +36,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var appDatabase: AppDatabase
     private lateinit var realTranslator: RealTranslator
     private lateinit var translationRepo: TranslationRepository
-
+    private lateinit var ttsService: TextToSpeechService
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,6 +56,7 @@ class MainActivity : ComponentActivity() {
 
         translationRepo = TranslationRepository(firebaseRepo, cacheDao, realTranslator)
 
+        ttsService = TextToSpeechService(applicationContext)
 
         setContent {
             Course_project_obile_application_for_memorizing_new_words_WordBoostTheme { // Ваша тема
@@ -63,7 +65,8 @@ class MainActivity : ComponentActivity() {
                         authRepo = authRepo,
                         practiceRepo = practiceRepo,
                         firebaseRepo = firebaseRepo,
-                        translationRepo = translationRepo
+                        translationRepo = translationRepo,
+                        ttsService = ttsService
                     )
                 }
             }
@@ -86,7 +89,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // За потреби, закрийте тут ресурси
-        // appDatabase.close() // Обережно: може бути ще потрібна WorkManager
+        ttsService.shutdown()
+        // appDatabase.close()
     }
 }
