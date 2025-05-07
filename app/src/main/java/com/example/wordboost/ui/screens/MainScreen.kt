@@ -13,7 +13,8 @@ import com.example.wordboost.data.repository.TranslationRepository // Перек
 import com.example.wordboost.data.tts.TextToSpeechService // Переконайтесь в імпорті
 import com.example.wordboost.viewmodel.EditWordViewModelFactory
 import com.example.wordboost.viewmodel.WordListViewModelFactory
-
+import com.example.wordboost.viewmodel.PracticeViewModelFactory
+import com.example.wordboost.ui.screens.PracticeScreen
 
 enum class AppState {
     Loading,
@@ -38,9 +39,22 @@ fun MainScreen(
 ) {
     var currentAppState by remember { mutableStateOf<AppState>(AppState.Loading) }
     var editingWordId by remember { mutableStateOf<String?>(null) }
+
+
+    // --- Створюємо Factory для ViewModel Практики ---
+    // Factory потребує PracticeRepository, TtsService та AuthRepository
+    val practiceViewModelFactory = remember(practiceRepo, ttsService, authRepo) {
+        // Передаємо practiceRepo як repository до PracticeViewModelFactory
+        PracticeViewModelFactory(repository = practiceRepo, ttsService = ttsService, authRepository = authRepo)
+    }
+
+    // --- Створюємо Factory для ViewModel Списку Слів (якщо вона тут потрібна) ---
     val wordListViewModelFactory = remember(firebaseRepo, authRepo, ttsService) {
+        // Передаємо firebaseRepo як repository до WordListViewModelFactory
         WordListViewModelFactory(repository = firebaseRepo, authRepository = authRepo, ttsService = ttsService)
     }
+
+
     LaunchedEffect(authRepo) { // Запускається при зміні authRepo (або один раз при старті)
         Log.d("MainScreen", "Collecting auth state...")
         authRepo.getAuthState().collect { user ->
@@ -139,15 +153,15 @@ fun MainScreen(
         }
         AppState.AuthenticatedPractice -> {
             PracticeScreen(
-                practiceRepo = practiceRepo,
-                ttsService = ttsService,
-                authRepository = authRepo,
-                onBack = {
+                factory = practiceViewModelFactory, // <<< Передаємо Factory
+                onBack = { // Колбек повернення з PracticeScreen
                     Log.d("MainScreen", "Practice Back, Navigating to AuthenticatedMain")
-                    currentAppState = AppState.AuthenticatedMain
+                    currentAppState = AppState.AuthenticatedMain // Повертаємось до головного
                 }
             )
         }
+
+
         AppState.AuthenticatedWordList -> {
             WordListScreen(
                 repository = firebaseRepo,

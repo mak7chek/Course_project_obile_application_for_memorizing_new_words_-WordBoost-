@@ -10,7 +10,12 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.WriteBatch
 import kotlinx.coroutines.tasks.await
 import android.util.Log
-
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.callbackFlow
+import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.Query.Direction
 
 class FirebaseRepository(private val authRepository: AuthRepository) {
 
@@ -30,31 +35,64 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
     }
 
     // !!! ПРИБРАНО обчислювані властивості userId, wordsCollection, groupsCollection !!!
-
-    fun getUserWordsForPractice(callback: (List<Word>) -> Unit) {
-        val wordsCollection = getUserWordsCollection() // Отримуємо колекцію
-        if (wordsCollection == null) { // Перевірка, чи користувач залогінений
-            callback(emptyList())
-            return
+    fun getWordsNeedingPracticeFlow(): Flow<List<Word>> {
+        val wordsCollection = getUserWordsCollection()
+        if (wordsCollection == null) {
+            Log.w("FirebaseRepo", "User not logged in, cannot get practice words flow.")
+            return emptyFlow()
         }
 
-        val now = System.currentTimeMillis()
-        wordsCollection
-            .whereLessThanOrEqualTo("nextReview", now)
-            // .whereNotEqualTo("status", "mastered") // Можна спробувати додати цей фільтр тут, якщо є індекс
-            .orderBy("nextReview")
-            //.limit(50) // Опціонально: обмежити кількість слів за сесію
-            .get()
-            .addOnSuccessListener { result ->
-                val words = result.documents.mapNotNull { it.toObject(Word::class.java) }
-                    .filter { it.status != "mastered" }
-                callback(words)
+        // Використовуємо callbackFlow для обгортання Firestore real-time listener
+        return callbackFlow {
+            // Прибираємо статичний фільтр за часом з запиту Firestore
+            val query = wordsCollection
+                // Фільтруємо 'mastered' на стороні Firebase, якщо є індекс, або повністю покладаємось на клієнтську фільтрацію нижче.
+                // Для надійності, давайте залишимо клієнтську фільтрацію як основну.
+                // .whereNotEqualTo("status", "mastered") // Опціонально: вимагає індексу
+                .orderBy("nextReview", Direction.ASCENDING) // Залишаємо сортування
+
+            Log.d("FirebaseRepo", "Starting real-time listener for practice words (client-side time filter).")
+
+            val listenerRegistration = query.addSnapshotListener { snapshot, exception ->
+                if (exception != null) {
+                    Log.e("FirebaseRepo", "Error listening for practice words", exception)
+                    close(exception)
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null) {
+                    // Отримуємо поточний час *в момент отримання snapshot'а*
+                    val now = System.currentTimeMillis()
+                    val words = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            doc.toObject(Word::class.java)
+                        } catch (e: Exception) {
+                            Log.e("FirebaseRepo", "Error mapping Firestore document to Word: ${doc.id}", e)
+                            null
+                        }
+                    }
+                    val wordsNeedingPractice = words
+                        .filter { it.nextReview <= now } // Фільтруємо за часом *зараз*
+                        .filter { it.status != "mastered" } // Фільтруємо "mastered"
+
+                    Log.d("FirebaseRepo", "Listener received ${snapshot.size()} documents. Filtered to ${wordsNeedingPractice.size} words needing practice.")
+                    trySend(wordsNeedingPractice).isSuccess
+                } else {
+                    Log.d("FirebaseRepo", "Listener received null snapshot.")
+                    trySend(emptyList()).isSuccess
+                }
             }
-            .addOnFailureListener { e ->
-                Log.e("FirebaseRepo", "Error getting practice words", e)
-                callback(emptyList())
+
+            // Припиняємо слухати, коли Flow скасовується (наприклад, ViewModel очищається)
+            awaitClose {
+                Log.d("FirebaseRepo", "Stopping real-time listener for practice words.")
+                listenerRegistration.remove()
             }
+        }
     }
+
+
+
 
     fun getWordObject(text: String, callback: (Word?) -> Unit) {
         val wordsCollection = getUserWordsCollection()

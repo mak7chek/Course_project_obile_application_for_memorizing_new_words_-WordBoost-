@@ -89,6 +89,5 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         ttsService.shutdown()
-        // appDatabase.close()
     }
 }

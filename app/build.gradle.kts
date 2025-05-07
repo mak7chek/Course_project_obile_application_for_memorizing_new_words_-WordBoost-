@@ -62,44 +62,57 @@ android {
 }
 
 dependencies {
-    implementation("androidx.compose.ui:ui:1.8.0")
-    implementation("androidx.compose.ui:ui-tooling-preview:1.8.0")
-    implementation("androidx.activity:activity-compose:1.10.1")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    implementation("androidx.compose.runtime:runtime-livedata:1.8.0")
-    implementation("androidx.work:work-runtime-ktx:2.10.1")
-    implementation("androidx.compose.material3:material3:1.3.2")
-    implementation("androidx.compose.foundation:foundation:1.7.8")
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation(libs.androidx.media3.common.ktx)
-    kapt("androidx.room:room-compiler:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    implementation(platform("com.google.firebase:firebase-bom:33.12.0"))
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
+
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.runtime.ktx) // KTX runtime часто йде окремо
+
+    // Явно вказуємо версію Material 3, якщо вона відрізняється від версії BOM за замовчуванням
+    // Переконайтесь, що 1.3.2 сумісна з вашим BOM (1.8.0).
+    implementation("androidx.compose.material3:material3:1.3.2")
+    implementation("androidx.compose.material3:material3-window-size-class:1.3.2") // Версія Material 3 має бути однакова
+
+    // Інші Compose-пов'язані бібліотеки, які можуть мати власні версії або не входити в BOM
+    implementation("androidx.navigation:navigation-compose:2.7.7") // Залиште явну версію
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7") // Залиште явну версію
+    implementation("androidx.compose.runtime:runtime-livedata:1.8.0") // Залиште явну версію, якщо потрібна саме ця
+
+
+    // Інші залежності вашого проєкту
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
+    implementation("androidx.room:room-runtime:2.6.1")
+    kapt("androidx.room:room-compiler:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+
+    implementation(platform("com.google.firebase:firebase-bom:33.12.0"))
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-analytics")
-    implementation(libs.firebase.common.ktx)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0") // Напр., 1.7.3
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0") // Напр., 1.7.3
-    implementation(libs.firebase.firestore.ktx)
-    implementation(libs.androidx.room.common.jvm)
+    // libs.firebase.common.ktx, ймовірно, надається BOM або іншими залежностями Firebase
+
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.google.code.gson:gson:2.10.1")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+
+    // Тестові залежності
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(platform(libs.androidx.compose.bom)) // Використовуйте BOM і для тестів
     androidTestImplementation(libs.androidx.ui.test.junit4)
+
+    // Debug залежності
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+    implementation(libs.androidx.media3.common.ktx)
+    implementation(libs.androidx.room.common.jvm) // Залиште
 }
 apply(plugin = "com.google.gms.google-services")
