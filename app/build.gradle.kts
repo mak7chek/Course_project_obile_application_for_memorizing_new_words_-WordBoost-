@@ -51,6 +51,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     kotlinOptions {
         jvmTarget = "11"
     }
@@ -89,7 +90,8 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-analytics")
     implementation(libs.firebase.common.ktx)
-
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0") // Напр., 1.7.3
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0") // Напр., 1.7.3
     implementation(libs.firebase.firestore.ktx)
     implementation(libs.androidx.room.common.jvm)
     testImplementation(libs.junit)

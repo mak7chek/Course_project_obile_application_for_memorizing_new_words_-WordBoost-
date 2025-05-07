@@ -21,7 +21,7 @@ import com.example.wordboost.data.model.Group
 
 @Composable
 fun CustomGroupDialog(
-    groups: List<Group>,
+    editableGroups: List<Group>,
     selectedGroupId: String?,
     onGroupSelected: (String?) -> Unit,
     onCreateGroup: (String) -> Unit,
@@ -140,7 +140,7 @@ fun CustomGroupDialog(
 
                             Divider(modifier = Modifier.padding(vertical = 8.dp))
 
-                            groups.forEach { group ->
+                            editableGroups.forEach { group ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()

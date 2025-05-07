@@ -1,16 +1,18 @@
 package com.example.wordboost.ui.screens
+
 import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-
-import com.example.wordboost.data.firebase.AuthRepository
-import com.example.wordboost.data.firebase.FirebaseRepository
-import com.example.wordboost.data.repository.PracticeRepository
-import com.example.wordboost.data.repository.TranslationRepository
-import com.example.wordboost.data.tts.TextToSpeechService
+import com.example.wordboost.data.firebase.AuthRepository // Переконайтесь в імпорті
+import com.example.wordboost.data.firebase.FirebaseRepository // Переконайтесь в імпорті
+import com.example.wordboost.data.repository.PracticeRepository // Переконайтесь в імпорті
+import com.example.wordboost.data.repository.TranslationRepository // Переконайтесь в імпорті
+import com.example.wordboost.data.tts.TextToSpeechService // Переконайтесь в імпорті
+import com.example.wordboost.viewmodel.EditWordViewModelFactory
+import com.example.wordboost.viewmodel.WordListViewModelFactory
 
 
 enum class AppState {
@@ -21,7 +23,8 @@ enum class AppState {
     AuthenticatedMain,
     AuthenticatedTranslate,
     AuthenticatedPractice,
-    AuthenticatedWordList
+    AuthenticatedWordList,
+    AuthenticatedEditWord
 }
 
 
@@ -33,21 +36,31 @@ fun MainScreen(
     translationRepo: TranslationRepository,
     ttsService: TextToSpeechService
 ) {
-
     var currentAppState by remember { mutableStateOf<AppState>(AppState.Loading) }
-
-    LaunchedEffect(Unit) {
-        Log.d("MainScreen", "Checking authentication status...")
-        val currentUser = authRepo.getCurrentUser()
-        currentAppState = if (currentUser != null && currentUser.isEmailVerified) {
-            Log.d("MainScreen", "User authenticated and verified.")
-            AppState.AuthenticatedMain
-        } else {
-            Log.d("MainScreen", "User not authenticated or not verified.")
-            AppState.UnauthenticatedChoice
-        }
-        Log.d("MainScreen", "Initial AppState: $currentAppState")
+    var editingWordId by remember { mutableStateOf<String?>(null) }
+    val wordListViewModelFactory = remember(firebaseRepo, authRepo, ttsService) {
+        WordListViewModelFactory(repository = firebaseRepo, authRepository = authRepo, ttsService = ttsService)
     }
+    LaunchedEffect(authRepo) { // Запускається при зміні authRepo (або один раз при старті)
+        Log.d("MainScreen", "Collecting auth state...")
+        authRepo.getAuthState().collect { user ->
+            Log.d("MainScreen", "Auth state changed in collect: User ID = ${user?.uid}")
+            currentAppState = if (user != null && user.isEmailVerified) {
+                Log.d("MainScreen", "User authenticated and verified.")
+                AppState.AuthenticatedMain
+            } else if (user != null && !user.isEmailVerified) {
+                Log.d("MainScreen", "User authenticated but NOT verified.")
+                AppState.UnauthenticatedChoice // Або повертаємо на вибір автентифікації
+            }
+            else {
+                Log.d("MainScreen", "User is null (logged out).")
+                AppState.UnauthenticatedChoice // Якщо користувач null, переходимо на екран вибору автентифікації
+            }
+            Log.d("MainScreen", "AppState updated to: $currentAppState")
+        }
+    }
+
+
 
     when (currentAppState) {
         AppState.Loading -> {
@@ -110,8 +123,8 @@ fun MainScreen(
                 onLogoutClick = {
                     Log.d("MainScreen", "Logging out")
                     authRepo.logout()
-                    currentAppState = AppState.UnauthenticatedChoice
-                }
+                },
+                wordListViewModelFactory = wordListViewModelFactory
             )
         }
         AppState.AuthenticatedTranslate -> {
@@ -127,20 +140,23 @@ fun MainScreen(
         AppState.AuthenticatedPractice -> {
             PracticeScreen(
                 practiceRepo = practiceRepo,
+                ttsService = ttsService,
+                authRepository = authRepo,
                 onBack = {
                     Log.d("MainScreen", "Practice Back, Navigating to AuthenticatedMain")
                     currentAppState = AppState.AuthenticatedMain
-                },
-                ttsService = ttsService
+                }
             )
         }
         AppState.AuthenticatedWordList -> {
             WordListScreen(
                 repository = firebaseRepo,
                 ttsService = ttsService,
+                authRepository = authRepo,
                 onWordEdit = { wordId ->
-                    Log.d("MainScreen", "Attempt to edit word: $wordId")
-                    currentAppState = AppState.AuthenticatedMain
+                    Log.d("MainScreen", "Handling onWordEdit. Navigating to AuthenticatedEditWord for word ID: $wordId")
+                    editingWordId = wordId
+                    currentAppState = AppState.AuthenticatedEditWord
                 },
                 onBack = {
                     Log.d("MainScreen", "WordList Back, Navigating to AuthenticatedMain")
@@ -148,6 +164,22 @@ fun MainScreen(
                 }
             )
         }
+        AppState.AuthenticatedEditWord -> {
+            if (editingWordId != null) {
+                EditWordScreen(
+                    wordId = editingWordId,
+                    factory = EditWordViewModelFactory(repository = firebaseRepo, wordId = editingWordId),
+                    onBack = {
+                        Log.d("MainScreen", "Handling onBack from EditWordScreen. Navigating back to AuthenticatedWordList.")
+                        editingWordId = null
+                        currentAppState = AppState.AuthenticatedWordList
+                    }
+                )
+            } else {
 
+                Log.e("MainScreen", "Attempted to navigate to EditWord with null editingWordId. Redirecting to WordList.")
+                currentAppState = AppState.AuthenticatedWordList
+            }
+        }
     }
 }

@@ -1,5 +1,6 @@
-package com.example.wordboost.ui.screens
+package com.example.wordboost.ui.screens // Переконайтесь, що пакет правильний
 
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,44 +10,66 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.livedata.observeAsState
+// !!! ВИДАЛИТИ ЦЕЙ ІМПОРТ LiveData !!!
+// import androidx.compose.runtime.livedata.observeAsState
+// !!! ВИКОРИСТОВУЄМО collectAsState !!!
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-
+// Переконайтесь, що імпорти репозиторіїв, моделей та сервісів правильні
+import com.example.wordboost.data.firebase.AuthRepository
 import com.example.wordboost.data.firebase.FirebaseRepository
-import com.example.wordboost.data.model.Group
-import com.example.wordboost.data.model.Word
+import com.example.wordboost.data.model.Group // Переконайтесь в імпорті Group
+import com.example.wordboost.data.model.Word // Переконайтесь в імпорті Word
 import com.example.wordboost.data.tts.TextToSpeechService
+// Переконайтесь в імпорті ViewModel та Factory
 import com.example.wordboost.viewmodel.WordListViewModel
 import com.example.wordboost.viewmodel.WordListViewModelFactory
-import com.example.wordboost.ui.components.WordListItem
+import com.example.wordboost.viewmodel.WordDisplayItem // Переконайтесь в імпорті WordDisplayItem
+import com.example.wordboost.ui.components.WordListItem // Переконайтесь в імпорті WordListItem
+// Якщо CustomGroupDialog викликається з цього екрану і потрібен тут
+// import com.example.wordboost.presentation.ui.components.CustomGroupDialog
+
+
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import kotlinx.coroutines.launch
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WordListScreen(
-    repository: FirebaseRepository,
-    ttsService: TextToSpeechService,
-    onWordEdit: (wordId: String) -> Unit,
-    onBack: () -> Unit
+    repository: FirebaseRepository, // Потрібен для Factory
+    ttsService: TextToSpeechService, // Потрібен для Factory
+    authRepository: AuthRepository, // Потрібен для Factory
+    onWordEdit: (wordId: String) -> Unit, // Колбек для навігації на редагування
+    onBack: () -> Unit // Колбек для повернення назад
 ) {
-    val viewModel: WordListViewModel = viewModel(factory = WordListViewModelFactory(repository = repository, ttsService = ttsService))
+    // Отримуємо ViewModel за допомогою Factory
+    val viewModel: WordListViewModel = viewModel(
+        factory = WordListViewModelFactory(
+            repository = repository,
+            ttsService = ttsService,
+            authRepository = authRepository
+        )
+    )
 
-    val displayedWords by viewModel.displayedWords.observeAsState(initial = emptyList())
-    val groups by viewModel.groups.observeAsState(initial = emptyList())
-    val isLoading by viewModel.isLoading.observeAsState(initial = false)
-    val errorMessage by viewModel.errorMessage.observeAsState()
-    val searchQuery by viewModel.searchQuery.observeAsState(initial = "")
-    val selectedGroupIdFilter by viewModel.selectedGroupIdFilter.observeAsState()
+    // !!! ВИКОРИСТОВУЄМО collectAsState() ДЛЯ СПОСТЕРЕЖЕННЯ ЗА StateFlow !!!
+    // Ці StateFlow визначені у WordListViewModel і оновлюються автоматично
+    val displayedWords by viewModel.displayedWords.collectAsState(initial = emptyList())
+    val groups by viewModel.groups.collectAsState(initial = emptyList())
+    val isLoading by viewModel.isLoading.collectAsState(initial = false)
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState(initial = "")
+    val selectedGroupIdFilter by viewModel.selectedGroupIdFilter.collectAsState()
 
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
+    // LaunchedEffect для відображення повідомлень про помилку/статус
     LaunchedEffect(errorMessage) {
         errorMessage?.let { message ->
             coroutineScope.launch {
@@ -59,6 +82,7 @@ fun WordListScreen(
         }
     }
 
+    // Обробка натискання кнопки "Назад"
     BackHandler(enabled = true) { onBack() }
 
 
@@ -85,6 +109,7 @@ fun WordListScreen(
                 value = searchQuery,
                 onValueChange = { viewModel.setSearchQuery(it) },
                 label = { Text("Пошук слів...") },
+                singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -97,45 +122,72 @@ fun WordListScreen(
                 onGroupSelected = { groupId -> viewModel.setGroupFilter(groupId) }
             )
 
-            // Індикатор завантаження (зверху)
+            // Індикатор завантаження
             if (isLoading) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
-            if (displayedWords.isEmpty() && !isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (searchQuery.isNotBlank() || (selectedGroupIdFilter != null && selectedGroupIdFilter != "" && selectedGroupIdFilter != "no_group_filter")) {
+
+            // Відображення списку слів або повідомлення
+            when {
+                isLoading -> {
+                    // Показати індикатор
+                }
+                // Перевірка, якщо список порожній і НЕ завантажується
+                displayedWords.isEmpty() && !isLoading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val message = if (searchQuery.isNotBlank() || (selectedGroupIdFilter != null && selectedGroupIdFilter != "" && selectedGroupIdFilter != "no_group_filter")) {
                             "Не знайдено слів за цими критеріями"
                         } else {
-                            "Список слів порожній"
-                        },
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                }
-            }  else if (displayedWords.isNotEmpty() && !isLoading) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().weight(1f),
-                    contentPadding = PaddingValues(vertical = 8.dp)
-                ) {
-                    items(
-                        items = displayedWords,
-                        key = { it.id } // Використовуємо id з WordDisplayItem
-                    ) { item ->
-                        WordListItem(
-                            item = item,
-                            onItemClick = { word -> onWordEdit(word.id) },
-                            onEditClick = { word -> onWordEdit(word.id) },
-                            onResetClick = { word -> viewModel.resetWord(word) },
-                            onDeleteClick = { word -> viewModel.deleteWord(word.id) },
-                            formatDate = { timestamp -> viewModel.formatNextReviewDate(timestamp) },
-                            onPlaySound = { word -> viewModel.playWordSound(word) },
-                            wordProgress = item.progress,
+                            "Список слів порожній.\nДодайте перше слово!"
+                        }
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.headlineSmall,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
+                    }
+                }
+                // Якщо є слова для відображення і НЕ завантажується
+                displayedWords.isNotEmpty() && !isLoading -> {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f),
+                        contentPadding = PaddingValues(vertical = 8.dp)
+                    ) {
+                        items(
+                            items = displayedWords, // Список WordDisplayItem
+                            key = { it.id } // Унікальний ключ для елементів
+                        ) { item -> // item має тип WordDisplayItem
+                            WordListItem(
+                                item = item, // Передаємо WordDisplayItem
+
+                                // !!! ЯВНО ВКАЗУЄМО ТИП ПАРАМЕТРА ЛЯМБДИ !!!
+                                // WordListItem onItemClick очікує (Word) -> Unit
+                                onItemClick = { word: Word -> onWordEdit(word.id) }, // Лямбда приймає Word як параметр 'word'
+
+                                // WordListItem onEditClick очікує (Word) -> Unit
+                                onEditClick = { word: Word -> onWordEdit(word.id) }, // Лямбда приймає Word як параметр 'word'
+
+                                // WordListItem onResetClick очікує (Word) -> Unit
+                                onResetClick = { word: Word -> viewModel.resetWord(word) }, // Лямбда приймає Word як параметр 'word'
+
+                                // WordListItem onDeleteClick очікує (String) -> Unit (бо ViewModel приймає String ID)
+                                // Лямбда приймає String ID як параметр 'wordId'
+                                onDeleteClick = { word: Word -> viewModel.deleteWord(word.id) },
+
+                                // WordListItem onPlaySound очікує (Word) -> Unit
+                                onPlaySound = { word: Word -> viewModel.playWordSound(word) }, // Лямбда приймає Word як параметр 'word'
+
+                                formatDate = { timestamp -> viewModel.formatNextReviewDate(timestamp) },
+                                wordProgress = item.progress,
+                            )
+                        }
                     }
                 }
             }
@@ -143,6 +195,7 @@ fun WordListScreen(
     }
 }
 
+// GroupFilterDropdown залишається без змін
 @Composable
 fun GroupFilterDropdown(
     groups: List<Group>,
@@ -173,7 +226,8 @@ fun GroupFilterDropdown(
                 Text(
                     text = selectedGroupName,
                     style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp)
                 )
                 Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = "Виберіть групу")
             }
@@ -182,7 +236,7 @@ fun GroupFilterDropdown(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.width(IntrinsicSize.Max)
+            modifier = Modifier.width(200.dp)
         ) {
             groups.forEach { group ->
                 DropdownMenuItem(

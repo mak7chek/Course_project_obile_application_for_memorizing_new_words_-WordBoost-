@@ -25,7 +25,7 @@ import com.example.wordboost.viewmodel.PracticeViewModel
 import com.example.wordboost.viewmodel.PracticeViewModelFactory
 // Імпортуємо компоненти
 import com.example.wordboost.ui.components.PracticeCard
-
+import com.example.wordboost.data.firebase.AuthRepository
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 // import kotlin.random.Random // Random тепер використовується у ViewModel
@@ -46,9 +46,10 @@ enum class DragAnchors {
 fun PracticeScreen(
     practiceRepo: PracticeRepository,
     ttsService: TextToSpeechService,
+    authRepository: AuthRepository,
     onBack: () -> Unit
 ) {
-    val viewModel: PracticeViewModel = viewModel(factory = PracticeViewModelFactory(practiceRepo,ttsService))
+    val viewModel: PracticeViewModel = viewModel(factory = PracticeViewModelFactory(practiceRepo,ttsService,authRepository))
 
     val words by viewModel.words.collectAsState()
     val currentIndex by viewModel.currentIndex.collectAsState()
@@ -162,7 +163,7 @@ fun PracticeScreen(
                         isFlipped = isFlipped,
                         isReverse = isReverse,
                         onFlip = { viewModel.flipCard() },
-                        onReplaySound = { wordToSpeak -> viewModel.replayWordSound(wordToSpeak) }, 
+                        onReplaySound = { wordToSpeak -> viewModel.replayWordSound(wordToSpeak) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1.5f)
@@ -192,7 +193,9 @@ fun PracticeScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp),
                         horizontalArrangement = Arrangement.End
                     ) {
                         Text(

@@ -42,9 +42,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         FirebaseApp.initializeApp(this)
         scheduleCacheClearWork()
-
-        firebaseRepo = FirebaseRepository()
         authRepo = AuthRepository()
+        firebaseRepo = FirebaseRepository(authRepo)
         practiceRepo = PracticeRepository(firebaseRepo)
 
         appDatabase = Room.databaseBuilder(applicationContext, AppDatabase::class.java, "wordboost-db")

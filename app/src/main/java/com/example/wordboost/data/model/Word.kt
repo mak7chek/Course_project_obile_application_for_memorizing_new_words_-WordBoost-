@@ -7,7 +7,7 @@ data class Word(
     var id: String = "",
     val text: String = "",
     val translation: String = "",
-    val dictionaryId: String = "",
+    val dictionaryId: String? = null,
     // SM‑2 fields:
     val repetition: Int = 0,
     val easiness: Float = 2.5f,

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wordboost.data.model.Word
 import com.example.wordboost.data.repository.PracticeRepository
+import com.example.wordboost.data.firebase.AuthRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlin.random.Random
@@ -16,7 +17,7 @@ import kotlin.collections.firstOrNull
 import kotlin.collections.getOrNull
 import kotlin.collections.isNotEmpty
 
-class PracticeViewModel(private val practiceRepository: PracticeRepository, private val ttsService:TextToSpeechService) : ViewModel() {
+class PracticeViewModel(private val practiceRepository: PracticeRepository, private val ttsService:TextToSpeechService ,private val authRepository: AuthRepository ) : ViewModel() {
 
     // --- Стан UI та Дані ---
     private val _words = MutableStateFlow<List<Word>>(emptyList())

@@ -5,10 +5,14 @@ import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseUser
-
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.tasks.await
+import android.util.Log
 class AuthRepository {
-
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+
 
     fun registerUser(email: String, password: String, onResult: (Boolean, String?) -> Unit) {
         auth.createUserWithEmailAndPassword(email, password)
@@ -35,7 +39,19 @@ class AuthRepository {
                 }
             }
     }
-
+    fun getAuthState(): Flow<FirebaseUser?> = callbackFlow {
+        Log.d("AuthRepository", "Starting AuthState listener flow.")
+        val authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+            val user = firebaseAuth.currentUser
+            Log.d("AuthRepository", "AuthState changed: User ID = ${user?.uid}")
+            trySend(user).isSuccess
+        }
+        auth.addAuthStateListener(authStateListener)
+        awaitClose {
+            Log.d("AuthRepository", "Stopping AuthState listener flow.")
+            auth.removeAuthStateListener(authStateListener)
+        }
+    }
     fun sendEmailVerification(onResult: (Boolean, String?) -> Unit) {
         val user = auth.currentUser
         if (user != null && !user.isEmailVerified) {
@@ -78,11 +94,9 @@ class AuthRepository {
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     val user = auth.currentUser
-                    // Перевіряємо верифікацію email одразу після входу
                     if (user != null && user.isEmailVerified) {
                         onResult(true, "Успішний вхід.")
                     } else if (user != null && !user.isEmailVerified) {
-                        // Вхід успішний, але email не верифіковано
                         onResult(false, "Будь ласка, підтвердьте вашу email адресу перед входом.")
                         // Можна запропонувати повторне надсилання листа верифікації
                         // або зробити це автоматично (якщо ви вважаєте це доцільним в UI)
@@ -91,11 +105,9 @@ class AuthRepository {
                         onResult(false, "Невідома помилка після входу.")
                     }
                 } else {
-                    // Вхід провалився, обробляємо помилки
                     val errorMessage = when (task.exception) {
                         is FirebaseAuthInvalidCredentialsException -> "Невірний email або пароль."
                         is FirebaseAuthInvalidUserException -> "Користувача з таким email не знайдено."
-                        // Можна додати інші типи помилок входу, якщо потрібно
                         else -> task.exception?.localizedMessage ?: "Помилка входу."
                     }
                     onResult(false, errorMessage)

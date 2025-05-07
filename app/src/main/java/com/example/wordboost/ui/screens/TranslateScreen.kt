@@ -23,7 +23,6 @@ import com.example.wordboost.ui.components.CustomGroupDialog
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
@@ -40,15 +39,13 @@ fun TranslateScreen(
     val viewModel: TranslateViewModel = viewModel(
         factory = TranslateViewModelFactory(firebaseRepo, translationRepo)
     )
-
+    val editableGroups by viewModel.editableGroups.collectAsState(initial = emptyList())
     val ukText by viewModel.ukText.collectAsState()
     val enText by viewModel.enText.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
-    val groups by viewModel.groups.collectAsState()
     val showGroupDialog by viewModel.showGroupDialog.collectAsState()
-    val selectedGroupId by viewModel.selectedGroupId.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-
+    val selectedGroupId by viewModel.selectedGroupId.collectAsState()
 
     BackHandler(enabled = true) { onBack() }
 
@@ -160,9 +157,11 @@ fun TranslateScreen(
     // Group selector dialog
     if (showGroupDialog) {
         CustomGroupDialog(
-            groups = groups,
-            selectedGroupId = selectedGroupId,
-            onGroupSelected = { viewModel.setSelectedGroupId(it) },
+            // !!! Передаємо editableGroups !!!
+            editableGroups = editableGroups, // <-- Передаємо фільтрований список
+            // !!! Передаємо поточний selectedGroupId (String?) !!!
+            selectedGroupId = selectedGroupId, // <-- Передаємо стан String?
+            onGroupSelected = { groupId -> viewModel.setSelectedGroupId(groupId) },
             onCreateGroup = { name -> viewModel.createGroup(name) },
             onRenameGroup = { groupId, newName -> viewModel.renameGroup(groupId, newName) },
             onDeleteGroup = { groupId -> viewModel.deleteGroup(groupId) },
