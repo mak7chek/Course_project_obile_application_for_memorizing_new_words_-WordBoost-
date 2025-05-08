@@ -29,6 +29,11 @@ import androidx.compose.ui.unit.IntOffset
 import kotlinx.coroutines.launch
 import android.util.Log
 
+// !!! Імпорти для фону !!!
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
+
+
 
 private enum class DragAnchors {
     Start,
@@ -37,7 +42,7 @@ private enum class DragAnchors {
 }
 
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class) // Додано OptIn для AnchoredDraggable
 @Composable
 fun RegularPracticeUI(
     word: Word?,
@@ -49,6 +54,7 @@ fun RegularPracticeUI(
     onSpeakTranslationClick: (String) -> Unit, // Колбек для озвучення (передається далі)
     modifier: Modifier = Modifier
 ) {
+    // !!! Стан для жестів свайпу (перенесено з попередньої реалізації RegularPracticeUI) !!!
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
     val defaultActionSize = 100.dp
@@ -57,11 +63,11 @@ fun RegularPracticeUI(
     val anchoredDraggableState = remember {
         AnchoredDraggableState<DragAnchors>(
             initialValue = DragAnchors.Start,
-            anchors = DraggableAnchors<DragAnchors> { DragAnchors.Start at 0f },
+            anchors = DraggableAnchors<DragAnchors> { DragAnchors.Start at 0f }, // Початкові якорі
             positionalThreshold = { distance: Float -> distance * 0.5f },
             velocityThreshold = { with(density) { 100.dp.toPx() } },
             snapAnimationSpec = tween(),
-            decayAnimationSpec = exponentialDecay()
+            decayAnimationSpec = exponentialDecay() // Використовуйте повний шлях
         )
     }
 
@@ -107,6 +113,7 @@ fun RegularPracticeUI(
     }
 
     // Автоматичне озвучення перекладу при переході в стан Answer
+    // Цей LaunchedEffect вже був у вашому коді, залишаємо його
     LaunchedEffect(cardState) {
         if (cardState == CardState.Answer && word != null) {
             val translation = word.translation
@@ -122,6 +129,7 @@ fun RegularPracticeUI(
     }
 
     // Обробка завершення анімації свайпу (коли картка досягла якоря Know або DontKnow)
+    // Цей LaunchedEffect вже був у вашому коді, залишаємо його
     LaunchedEffect(anchoredDraggableState.targetValue) {
         val target = anchoredDraggableState.targetValue
         Log.d("RegularPracticeUI", "AnchoredDraggable targetValue changed: $target. CardState: $cardState")
@@ -148,17 +156,39 @@ fun RegularPracticeUI(
     }
 
     Column(
-        modifier = modifier.fillMaxSize(), // Застосовуємо модифікатор ззовні (з паддінгом)
+        modifier = modifier
+            .fillMaxSize() // Застосовуємо модифікатор ззовні (з паддінгом)
+            // !!! ДОДАЄМО ГРАДІЄНТНИЙ ФОН !!!
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.surfaceContainerHigh, // Колір зверху
+                        MaterialTheme.colorScheme.background // Колір знизу
+                        // Ви можете обрати інші кольори з вашої теми
+                    )
+                )
+            )
+            .padding(horizontal = 16.dp, vertical = 8.dp), // Внутрішні відступи колонки
         horizontalAlignment = Alignment.CenterHorizontally, // Центруємо вміст по горизонталі
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.Top // Вирівнюємо вміст колонки зверху, щоб вага працювала
     ) {
-        Text("Звичайна Практика", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "Звичайна Практика",
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.padding(top = 8.dp, bottom = 16.dp) // Додано нижній відступ
+        )
+
+        // !!! Spacer для відцентрування картки вертикально !!!
+        Spacer(modifier = Modifier.weight(1f)) // Перший Spacer займає 1 частину доступного простору
 
         if (word != null) {
+            // CardContainer для розміщення PracticeCard та обробки жестів
             Box(
+                // !!! Надаємо Box вагу для пропорційного розміщення на екрані !!!
                 modifier = Modifier
                     .fillMaxWidth(0.9f) // Картка займає 90% ширини батьківського контейнера
-                    .aspectRatio(3f / 2f) // Зберігаємо співвідношення сторін картки
+                    .aspectRatio(3f / 2f) // Зберігаємо співвідношення сторін картки (3:2)
+                    .weight(2f) // Box займає 2 частини доступного простору (разом зі Spacers це 1+2+1=4 частини)
                     .offset {
                         // Зсуваємо картку по горизонталі відповідно до стану anchoredDraggable
                         IntOffset(
@@ -168,48 +198,58 @@ fun RegularPracticeUI(
                             y = 0
                         )
                     }
-                    .anchoredDraggable( // Додаємо модифікатор для свайпу
+                    // Модифікатор свайпу
+                    .anchoredDraggable(
                         state = anchoredDraggableState, // Використовуємо AnchoredDraggableState
                         orientation = Orientation.Horizontal, // Свайп по горизонталі
                         enabled = cardState == CardState.Answer // Вмикаємо свайп тільки у стані Answer
                     )
-                    .clickable(enabled = cardState == CardState.Prompt) { // Додаємо модифікатор кліку
+                    // Модифікатор кліку для перегортання
+                    .clickable(enabled = cardState == CardState.Prompt) { // Клік можливий тільки в стані Prompt
                         Log.d("RegularPracticeUI", "Card clicked to flip. CardState: $cardState. Calling onFlipCard().")
                         onFlipCard() // Викликаємо колбек для перевороту картки
-                    }
+                    },
+                contentAlignment = Alignment.Center // Центруємо PracticeCard всередині Box
             ) {
                 // Відображаємо саму картку PracticeCard
                 PracticeCard(
                     word = word,
                     cardState = cardState,
                     promptContentType = promptContentType,
-                    // onFlipCard is removed from PracticeCard, so we don't pass it here
                     onReplayTranslationClick = { word.translation?.let { onSpeakTranslationClick(it) } }, // Передаємо колбек для озвучення (з іконки)
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize() // Картка заповнює контейнер Box
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            // Spacer(modifier = Modifier.height(8.dp)) // Цей Spacer тепер не потрібен через verticalArrangement та вагові Spacers
 
+            // Текст підказки (клікніть або свайпніть)
             Text(
                 text = when(cardState) {
                     CardState.Prompt -> "Клікніть картку для перекладу"
-                    // Оновлено текст підказки
+                    // Оновлено текст підказки з балами
                     CardState.Answer -> "Свайпніть картку: Вліво - Важко (2), Вправо - Легко (5)"
                 },
-                style = MaterialTheme.typography.bodyMedium, // Доступ до типографії через MaterialTheme
+                style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
+
+            // !!! Spacer для відцентрування картки вертикально !!!
+            Spacer(modifier = Modifier.weight(1f)) // Другий Spacer займає 1 частину доступного простору
+
 
         } else {
             // Відображаємо повідомлення, якщо слів для практики немає
             Text(
                 text = "Слів для практики поки немає.\nПеревірте список слів або спробуйте пізніше.",
                 textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.headlineSmall, // Доступ до типографії через MaterialTheme
-                modifier = Modifier.align(Alignment.CenterHorizontally) // Центруємо по горизонталі
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onBackground
             )
+            // Додаємо Spacer знизу, якщо немає слів, щоб повідомлення було відцентроване
+            Spacer(modifier = Modifier.weight(1f))
         }
     }
 }

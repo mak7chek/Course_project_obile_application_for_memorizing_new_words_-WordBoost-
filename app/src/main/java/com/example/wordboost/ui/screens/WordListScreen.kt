@@ -10,14 +10,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-// !!! ВИДАЛИТИ ЦЕЙ ІМПОРТ LiveData !!!
-// import androidx.compose.runtime.livedata.observeAsState
-// !!! ВИКОРИСТОВУЄМО collectAsState !!!
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.collectAsState // ВИКОРИСТОВУЄМО collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+
+// Імпорти для фону
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
 
 // Переконайтесь, що імпорти репозиторіїв, моделей та сервісів правильні
 import com.example.wordboost.data.firebase.AuthRepository
@@ -29,9 +30,9 @@ import com.example.wordboost.data.tts.TextToSpeechService
 import com.example.wordboost.viewmodel.WordListViewModel
 import com.example.wordboost.viewmodel.WordListViewModelFactory
 import com.example.wordboost.viewmodel.WordDisplayItem // Переконайтесь в імпорті WordDisplayItem
-import com.example.wordboost.ui.components.WordListItem // Переконайтесь в імпорті WordListItem
-// Якщо CustomGroupDialog викликається з цього екрану і потрібен тут
-// import com.example.wordboost.presentation.ui.components.CustomGroupDialog
+// Переконайтесь в імпорті WordListItem та GroupFilterDropdown
+import com.example.wordboost.ui.components.WordListItem
+import com.example.wordboost.ui.components.GroupFilterDropdown // Використовуємо перейменований компонент
 
 
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -56,13 +57,13 @@ fun WordListScreen(
         )
     )
 
-    // !!! ВИКОРИСТОВУЄМО collectAsState() ДЛЯ СПОСТЕРЕЖЕННЯ ЗА StateFlow !!!
-    // Ці StateFlow визначені у WordListViewModel і оновлюються автоматично
+    // ВИКОРИСТОВУЄМО collectAsState() ДЛЯ СПОСТЕРЕЖЕННЯ ЗА StateFlow
     val displayedWords by viewModel.displayedWords.collectAsState(initial = emptyList())
     val groups by viewModel.groups.collectAsState(initial = emptyList())
     val isLoading by viewModel.isLoading.collectAsState(initial = false)
     val errorMessage by viewModel.errorMessage.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState(initial = "")
+    // ViewModel тепер очікує null для "Всі групи"
     val selectedGroupIdFilter by viewModel.selectedGroupIdFilter.collectAsState()
 
 
@@ -101,8 +102,20 @@ fun WordListScreen(
     ) { paddingValues ->
         Column(
             modifier = Modifier
-                .padding(paddingValues)
+                .padding(paddingValues) // Застосовуємо паддінг від Scaffold та TopAppBar
                 .fillMaxSize()
+                // ДОДАЄМО ГРАДІЄНТНИЙ ФОН
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.surfaceContainerHigh, // Колір зверху
+                            MaterialTheme.colorScheme.background // Колір знизу
+                            // Ви можете обрати інші кольори з вашої теми
+                        )
+                    )
+                ),
+            // Додаємо вертикальний відступ між елементами Column
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Поле пошуку
             OutlinedTextField(
@@ -112,10 +125,12 @@ fun WordListScreen(
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 16.dp, vertical = 4.dp) // Зменшено вертикальний відступ, бо є spacedBy
+                // !!! ПРИБРАНО ФІКСОВАНУ ВИСОТУ !!!
+                // .height(56.dp)
             )
 
-            // Фільтр за групами
+            // Фільтр за групами (тепер без фіксованої висоти Box)
             GroupFilterDropdown(
                 groups = groups,
                 selectedGroupId = selectedGroupIdFilter,
@@ -129,8 +144,16 @@ fun WordListScreen(
 
             // Відображення списку слів або повідомлення
             when {
-                isLoading -> {
-                    // Показати індикатор
+                // Показати індикатор
+                isLoading && displayedWords.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
                 }
                 // Перевірка, якщо список порожній і НЕ завантажується
                 displayedWords.isEmpty() && !isLoading -> {
@@ -140,7 +163,7 @@ fun WordListScreen(
                             .weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
-                        val message = if (searchQuery.isNotBlank() || (selectedGroupIdFilter != null && selectedGroupIdFilter != "" && selectedGroupIdFilter != "no_group_filter")) {
+                        val message = if (searchQuery.isNotBlank() || (selectedGroupIdFilter != null)) {
                             "Не знайдено слів за цими критеріями"
                         } else {
                             "Список слів порожній.\nДодайте перше слово!"
@@ -148,7 +171,8 @@ fun WordListScreen(
                         Text(
                             text = message,
                             style = MaterialTheme.typography.headlineSmall,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 }
@@ -158,94 +182,30 @@ fun WordListScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .weight(1f),
-                        contentPadding = PaddingValues(vertical = 8.dp)
+                        contentPadding = PaddingValues(vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         items(
-                            items = displayedWords, // Список WordDisplayItem
-                            key = { it.id } // Унікальний ключ для елементів
-                        ) { item -> // item має тип WordDisplayItem
+                            items = displayedWords,
+                            key = { it.id }
+                        ) { item ->
                             WordListItem(
-                                item = item, // Передаємо WordDisplayItem
-
-                                // !!! ЯВНО ВКАЗУЄМО ТИП ПАРАМЕТРА ЛЯМБДИ !!!
-                                // WordListItem onItemClick очікує (Word) -> Unit
-                                onItemClick = { word: Word -> onWordEdit(word.id) }, // Лямбда приймає Word як параметр 'word'
-
-                                // WordListItem onEditClick очікує (Word) -> Unit
-                                onEditClick = { word: Word -> onWordEdit(word.id) }, // Лямбда приймає Word як параметр 'word'
-
-                                // WordListItem onResetClick очікує (Word) -> Unit
-                                onResetClick = { word: Word -> viewModel.resetWord(word) }, // Лямбда приймає Word як параметр 'word'
-
-                                // WordListItem onDeleteClick очікує (String) -> Unit (бо ViewModel приймає String ID)
-                                // Лямбда приймає String ID як параметр 'wordId'
-                                onDeleteClick = { word: Word -> viewModel.deleteWord(word.id) },
-
-                                // WordListItem onPlaySound очікує (Word) -> Unit
-                                onPlaySound = { word: Word -> viewModel.playWordSound(word) }, // Лямбда приймає Word як параметр 'word'
-
+                                item = item,
+                                onItemClick = { word: Word -> onWordEdit(word.id) },
+                                onEditClick = { word: Word -> onWordEdit(word.id) },
+                                onResetClick = { word: Word -> viewModel.resetWord(word) },
+                                onDeleteClick = { wordId: String -> viewModel.deleteWord(wordId) },
+                                onPlaySound = { word: Word -> viewModel.playWordSound(word) },
                                 formatDate = { timestamp -> viewModel.formatNextReviewDate(timestamp) },
                                 wordProgress = item.progress,
+                            )
+                            Divider(
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                             )
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-// GroupFilterDropdown залишається без змін
-@Composable
-fun GroupFilterDropdown(
-    groups: List<Group>,
-    selectedGroupId: String?,
-    onGroupSelected: (String?) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedGroupName = groups.find { it.id == selectedGroupId }?.name ?: "Виберіть групу"
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .height(56.dp)
-            .clickable { expanded = true },
-        contentAlignment = Alignment.CenterStart
-    ) {
-        OutlinedButton(
-            onClick = { expanded = true },
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = selectedGroupName,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp)
-                )
-                Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = "Виберіть групу")
-            }
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.width(200.dp)
-        ) {
-            groups.forEach { group ->
-                DropdownMenuItem(
-                    text = { Text(group.name, maxLines = 1) },
-                    onClick = {
-                        onGroupSelected(group.id)
-                        expanded = false
-                    }
-                )
             }
         }
     }

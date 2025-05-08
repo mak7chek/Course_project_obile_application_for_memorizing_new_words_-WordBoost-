@@ -12,7 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.wordboost.ui.components.GroupSelectionDropdown
+import com.example.wordboost.ui.components.GroupFilterDropdown
 import com.example.wordboost.viewmodel.EditWordViewModel
 import com.example.wordboost.viewmodel.EditWordViewModelFactory
 
@@ -108,7 +108,7 @@ fun EditWordScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                GroupSelectionDropdown(
+                GroupFilterDropdown(
                     groups = groups,
                     selectedGroupId = selectedGroupId,
                     onGroupSelected = { groupId -> viewModel.onGroupSelected(groupId) }

@@ -150,16 +150,16 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
             }
     }
 
-    // saveWord залишається з Callback
     fun saveWord(word: Word, callback: (Boolean) -> Unit = {}) {
-        val wordsCollection = getUserWordsCollection() // Отримуємо колекцію
-        if (wordsCollection == null || word.id.isBlank()) { // Перевірка + валідність ID
+        val wordsCollection = getUserWordsCollection()
+        if (wordsCollection == null || word.id.isBlank()) {
             Log.e("FirebaseRepo", "Cannot save word. User not logged in or word ID is blank.")
             callback(false)
             return
         }
-        wordsCollection.document(word.id)
-            .set(word, SetOptions.merge())
+
+        val documentRef = wordsCollection.document(word.id)
+        documentRef.set(word, SetOptions.merge())
             .addOnSuccessListener {
                 Log.d("FirebaseRepo", "Word ${word.id} saved successfully.")
                 callback(true)
@@ -171,8 +171,8 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
     }
 
     fun deleteWord(wordId: String, callback: (Boolean) -> Unit) {
-        val wordsCollection = getUserWordsCollection() // Отримуємо колекцію
-        if (wordsCollection == null || wordId.isBlank()) { // Перевірка + валідність ID
+        val wordsCollection = getUserWordsCollection()
+        if (wordsCollection == null || wordId.isBlank()) {
             Log.e("FirebaseRepo", "Cannot delete word. User not logged in or word ID is blank.")
             callback(false)
             return
@@ -199,6 +199,17 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
                 callback(null)
             }
             ?: callback(null) // Якщо колекція не доступна
+    }
+
+    suspend fun getWordById_Suspend(wordId: String): Word? {
+        val wordsCollection = getUserWordsCollection() ?: return null
+        return try {
+            val snapshot = wordsCollection.document(wordId).get().await()
+            snapshot.toObject(Word::class.java)
+        } catch (e: Exception) {
+            Log.e("FirebaseRepo", "Error getting word by ID: $wordId", e)
+            null
+        }
     }
     fun getWordsListener(callback: (List<Word>) -> Unit): ListenerRegistration? {
         val wordsCollection = getUserWordsCollection()

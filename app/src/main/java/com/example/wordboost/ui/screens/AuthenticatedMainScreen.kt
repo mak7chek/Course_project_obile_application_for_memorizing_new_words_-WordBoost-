@@ -1,198 +1,248 @@
+// ui.screens/AuthenticatedMainScreen.kt
 package com.example.wordboost.ui.screens
 
-import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ExitToApp
+// !!! Додано імпорт іконки книги !!!
+import androidx.compose.material.icons.filled.List
+
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color // Імпорт Color
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.contentColorFor
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Card
+import androidx.compose.foundation.shape.RoundedCornerShape
+
+// !!! Імпорти для градієнта !!!
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
+
+// Імпорти для зображення (якщо вирішите додати)
+// import androidx.compose.foundation.Image
+// import androidx.compose.ui.layout.ContentScale
+// import androidx.compose.ui.res.painterResource
+// import com.example.wordboost.R
+
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.material3.contentColorFor // Імпорт contentColorFor
+// import androidx.compose.ui.unit.sp // Якщо використовуєте явно (Typography це робить)
 
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 import com.example.wordboost.viewmodel.WordListViewModel
 import com.example.wordboost.viewmodel.WordListViewModelFactory
 
-// Імпорти репозиторіїв/сервісів, якщо вони потрібні для Factory
-import com.example.wordboost.data.firebase.AuthRepository
-import com.example.wordboost.data.firebase.FirebaseRepository
-import com.example.wordboost.data.tts.TextToSpeechService
+// Імпорти ViewModel та Factory мають бути правильними
+// import com.example.wordboost.data.firebase.AuthRepository
+// import com.example.wordboost.data.firebase.FirebaseRepository
+// import com.example.wordboost.data.tts.TextToSpeechService
 
-// Імпорт користувацьких кольорів (якщо ви їх визначили)
-// import com.example.wordboost.ui.theme.LearnNowColor
-// import com.example.wordboost.ui.theme.ShortTermColor
-// import com.example.wordboost.ui.theme.LearnedColor
+// Якщо StatisticCard в окремому файлі, розкоментуйте імпорт
+// import com.example.wordboost.ui.components.StatisticCard
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthenticatedMainScreen(
-    onTranslateClick: () -> Unit, // Колбек для переходу на екран перекладу (додавання слова)
-    onPracticeClick: () -> Unit, // Колбек для переходу на екран практики
-    onWordListClick: () -> Unit, // Колбек для переходу на екран списку слів
-    onLogoutClick: () -> Unit, // Колбек для виходу з облікового запису
-    // AuthenticatedMainScreen потребує Factory WordListViewModel для статистики
-    wordListViewModelFactory: WordListViewModelFactory // Приймаємо Factory як параметр з MainScreen
+    onTranslateClick: () -> Unit,
+    onPracticeClick: () -> Unit,
+    onWordListClick: () -> Unit,
+    onLogoutClick: () -> Unit,
+    wordListViewModelFactory: WordListViewModelFactory
 ) {
-    // Отримуємо екземпляр WordListViewModel за допомогою Factory.
-    // Цей ViewModel завантажує слова та статистику через Listener.
     val wordListViewModel: WordListViewModel = viewModel(factory = wordListViewModelFactory)
 
-    // --- Спостерігаємо за статистикою з WordListViewModel ---
-    // Ці State<Int> будуть автоматично оновлюватись при зміні статистики у ViewModel
     val wordsToLearnNowCount by wordListViewModel.wordsToLearnNowCount.collectAsState()
     val wordsInShortTermMemoryCount by wordListViewModel.wordsInShortTermMemoryCount.collectAsState()
     val learnedWordsCount by wordListViewModel.learnedWordsCount.collectAsState()
-
-    // --- Стан UI ---
-    // Можна додати стан для індикатора завантаження статистики, якщо потрібно
-    // val isStatsLoading by wordListViewModel.isLoading.collectAsState()
 
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("WordBoost") }, // Назва додатка як частина заголовка
+                title = { Text("WordBoost") },
                 actions = {
-                    // !!! КНОПКА ВИХОДУ В TOPAPPBAR !!!
-                    // Потрібен імпорт ExitToApp, наприклад: import androidx.compose.material.icons.filled.ExitToApp
                     IconButton(onClick = onLogoutClick) {
                         Icon(Icons.Default.ExitToApp, contentDescription = "Вийти")
                     }
                 }
             )
         },
-        // !!! КРУГЛА КНОПКА ДОДАВАННЯ СЛОВА (FAB) !!!
         floatingActionButton = {
-            // При кліку переходимо на екран перекладу/додавання
-            // Потрібен імпорт Add, наприклад: import androidx.compose.material.icons.filled.Add
             FloatingActionButton(onClick = onTranslateClick) {
                 Icon(Icons.Default.Add, contentDescription = "Додати слово")
             }
         },
-        // position = FabPosition.End, // Розташування FAB (End знизу праворуч за замовчуванням)
-        // isFloatingActionButtonDocked = false // Не докований FAB
     ) { paddingValues ->
-        Column(
+        // !!! Використовуємо Box для шарів !!!
+        Box(
             modifier = Modifier
-                .padding(paddingValues) // Застосовуємо паддінг від Scaffold та TopAppBar
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 8.dp), // Внутрішні відступи контенту
-            horizontalAlignment = Alignment.CenterHorizontally, // Центруємо вміст по горизонталі
-            verticalArrangement = Arrangement.spacedBy(16.dp) // Відступи між основними блоками
-        ) {
-
-            // --- Привітання ---
-            Text(
-                text = "Вітаємо у WordBoost!", // Або "Привіт, Користувач!"
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
+                .fillMaxSize() // Box заповнює весь доступний простір під Scaffold
+                // !!! ДОДАЄМО ГРАДІЄНТНИЙ ФОН ВИКОРИСТОВУЮЧИ КОЛЬОРИ ТЕМИ !!!
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            // Використовуйте кольори з вашої палітри теми (приклад)
+                            MaterialTheme.colorScheme.surfaceContainerHigh, // Колір зверху
+                            MaterialTheme.colorScheme.background // Колір знизу
+                            // Або custom кольори з Color.kt:
+                            // listOf(lightGradientTop, lightGradientBottom)
+                            // Додайте логіку для темної теми, якщо потрібно, наприклад:
+                            // if (isSystemInDarkTheme()) listOf(darkGradientTop, darkGradientBottom) else listOf(lightGradientTop, lightGradientBottom)
+                        )
+                    )
+                )
+            // Якщо ви хочете додати зображення поверх градієнта, додайте Image тут ПЕРЕД Column
+            /*
+            Image(
+                // ... параметри зображення ...
             )
-
-            // --- Блок Статистики (Три кольорові "Квадратики" в ОДИН РЯД) ---
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly, // Розподіл квадратиків по ширині
-                verticalAlignment = Alignment.CenterVertically // Вирівнювання по вертикалі
-            ) {
-                StatisticCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Вчити зараз",
-                    count = wordsToLearnNowCount,
-                    color = Color(0xFF297C2D)
-                )
-
-                StatisticCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Знаю",
-                    count = wordsInShortTermMemoryCount,
-                    color = Color(0xFF165B91)
-                )
-
-                StatisticCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Навчився",
-                    count = learnedWordsCount,
-                    color = Color(0xFFB7921E)
-                )
-            }
-
-            // !!! ВЕЛИКА КНОПКА ДЛЯ ПРАКТИКИ !!!
-            Spacer(modifier = Modifier.height(24.dp)) // Відступ після статистики
-            Button(
-                onClick = onPracticeClick, // Перехід на екран практики
+            */
+        ) {
+            // !!! Існуючий вміст Column розміщується НАД фоном (градієнтом або зображенням) !!!
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth(0.8f) // Ширина кнопки (80%)
-                    .height(72.dp) // Висота кнопки (зробимо її більшою)
+                    .padding(paddingValues) // !!! ЗАСТОСОВУЄМО ПАДДІНГ ВІД SCAFFOLD ТУТ !!!
+                    .fillMaxSize() // Column заповнює простір, доступний після паддінга
+                    .padding(
+                        horizontal = 16.dp,
+                        vertical = 8.dp
+                    ), // Ваші існуючі ВНУТРІШНІ відступи
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp) // Відступ між елементами Column
             ) {
+
                 Text(
-                    text = "Почати практику",
-                    style = MaterialTheme.typography.headlineSmall, // Більший шрифт
-                    textAlign = TextAlign.Center
+                    text = "Вітаємо у WordBoost!",
+                    style = MaterialTheme.typography.headlineMedium, // Використовуємо стиль з теми
+                    // !!! ЗБІЛЬШЕНО ВІДСТУП ЗНИЗУ !!!
+                    modifier = Modifier.padding(
+                        top = 8.dp,
+                        bottom = 32.dp
+                    ), // Збільшено нижній відступ
+                    color = MaterialTheme.colorScheme.onBackground // Колір тексту для фону з теми
                 )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // !!! Картки Статистики - використовують кольори теми або специфічні кольори !!!
+                    StatisticCard(
+                        modifier = Modifier.weight(1f),
+                        title = "Вчити зараз",
+                        count = wordsToLearnNowCount,
+                        // Використовуємо кольори контейнерів з теми як фон для карток
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                        // Або використовуйте ваші специфічні кольори з Color.kt:
+                        // containerColor = LearnNowColor
+                    )
+
+                    StatisticCard(
+                        modifier = Modifier.weight(1f),
+                        title = "Знаю",
+                        count = wordsInShortTermMemoryCount,
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    )
+
+                    StatisticCard(
+                        modifier = Modifier.weight(1f),
+                        title = "Навчився",
+                        count = learnedWordsCount,
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                        // Або: containerColor = LearnedColor
+                    )
+                }
+
+                // !!! ДОДАНО SPACER З ВАГОЮ ДЛЯ ПОСУВАННЯ КНОПОК ВНИЗ !!!
+                Spacer(modifier = Modifier.weight(1f))
+
+                // !!! ВЕЛИКА КНОПКА ДЛЯ ПРАКТИКИ (ТЕПЕР ПОСУНУТА ВНИЗ) !!!
+                // Spacer(modifier = Modifier.height(24.dp)) // Цей Spacer більше не потрібен після додавання Spacer(weight=1f) перед ним
+                Button(
+                    onClick = onPracticeClick,
+                    modifier = Modifier
+                        .fillMaxWidth(0.8f) // Ширина кнопки (80%)
+                        .height(72.dp), // Висота кнопки (зробимо її більшою)
+                    shape = RoundedCornerShape(50) // Заокруглені кути
+                    // Button автоматично використовує primary колір з теми та onPrimary для тексту
+                ) {
+                    Text(
+                        text = "Почати практику",
+                        style = MaterialTheme.typography.headlineSmall, // Використовуємо стиль з теми
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                // !!! КНОПКА "МІЙ СЛОВНИК" (СТИЛІЗОВАНО ТА ПОСУНУТО ВНИЗ) !!!
+                Spacer(modifier = Modifier.height(8.dp)) // Невеликий відступ між кнопками
+                TextButton( // Змінено на TextButton для меншої виразності
+                    onClick = onWordListClick,
+                    modifier = Modifier.fillMaxWidth(0.6f) // Менша ширина
+                    // TextButton не має фону чи контуру за замовчуванням
+                ) {
+                    // !!! Додано іконку книги перед текстом !!!
+                    Icon(
+                        imageVector = Icons.Default.List,
+                        contentDescription = "Мій словник",
+                        // Колір іконки TextButton за замовчуванням - primary
+                        tint = MaterialTheme.colorScheme.primary // Або інший колір з теми
+                    )
+                    Spacer(modifier = Modifier.width(8.dp)) // Відступ між іконкою та текстом
+                    Text(
+                        "Мій словник",
+                        style = MaterialTheme.typography.titleMedium
+                    ) // Використовуємо стиль з теми
+                }
             }
-
-            // !!! КНОПКА "МІЙ СЛОВНИК" (МЕНШ ВИРАЖЕНА) !!!
-            Spacer(modifier = Modifier.height(8.dp)) // Відступ після кнопки практики
-            OutlinedButton( // Використовуємо OutlinedButton для меншої виразності
-                onClick = onWordListClick, // Перехід на екран списку слів
-                modifier = Modifier.fillMaxWidth(0.6f) // Менша ширина
-            ) {
-                Text("Мій словник")
             }
-
-
-            // Використовуємо Spacer з weight, щоб "притиснути" вміст (крім FAB) до верхньої частини
-            Spacer(modifier = Modifier.weight(1f))
-
-            // FAB вже розміщений у слоті Scaffold
         }
     }
-}
 
+// !!! ЦЕЙ SPACER ТЕПЕР ВІДСУВАЄ ЗМІСТ НА
+// Компонент StatisticCard (помістіть його у цей файл або імпортуйте)
 @Composable
 fun StatisticCard(
-    modifier: Modifier = Modifier, // <--- Приймаємо modifier як параметр
-    title: String, // Заголовок квадратика
-    count: Int, // Кількість слів
-    color: Color // Колір фону картки
+    modifier: Modifier = Modifier,
+    title: String,
+    count: Int,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh
 ) {
     Card(
         modifier = modifier
-            .aspectRatio(1f)
-            .padding(4.dp),
+            .aspectRatio(1f) // Робимо квадратним
+            .padding(4.dp), // Відступ навколо картки
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp), // Тінь
-        shape = MaterialTheme.shapes.medium, // Форма картки
-        colors = CardDefaults.cardColors(containerColor = color) // Встановлюємо колір фону
+        shape = MaterialTheme.shapes.medium, // Форма картки з теми
+        colors = CardDefaults.cardColors(containerColor = containerColor) // Встановлюємо колір фону
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize() // Заповнюємо всю картку
                 .padding(8.dp), // Внутрішні відступи вмісту картки
-            horizontalAlignment = Alignment.CenterHorizontally, // Центруємо вміст по горизонталі
-            verticalArrangement = Arrangement.Center // Центруємо вміст по вертикалі
+            horizontalAlignment = Alignment.CenterHorizontally, // Центруємо вміст
+            verticalArrangement = Arrangement.Center // Центруємо вміст
         ) {
             Text(
                 text = count.toString(),
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineSmall, // Стиль для числа з теми
                 textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Bold, // Жирний шрифт
-                color = contentColorFor(backgroundColor = color) // Колір тексту залежить від кольору фону
+                fontWeight = FontWeight.Bold,
+                // Колір тексту автоматично підбирається для контрасту з фоном картки
+                color = contentColorFor(backgroundColor = containerColor)
             )
-            // !!! НАЗВА КАТЕГОРІЇ (ЗНИЗУ) !!!
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodySmall, // Менший шрифт для назви
+                style = MaterialTheme.typography.bodySmall, // Стиль для підпису з теми
                 textAlign = TextAlign.Center,
-                color = contentColorFor(backgroundColor = color) // Колір тексту залежить від кольору фону
+                color = contentColorFor(backgroundColor = containerColor) // Колір тексту автоматично підбирається
             )
         }
     }

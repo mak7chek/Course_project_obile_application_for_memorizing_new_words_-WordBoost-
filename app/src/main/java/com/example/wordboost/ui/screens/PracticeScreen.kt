@@ -20,6 +20,9 @@ import com.example.wordboost.viewmodel.PracticeViewModel
 import com.example.wordboost.viewmodel.PracticeViewModelFactory
 import com.example.wordboost.viewmodel.PracticePhase
 
+import androidx.compose.ui.res.painterResource
+import com.example.wordboost.R
+
 
 import kotlinx.coroutines.launch // Keep for snackbar coroutineScope
 import androidx.compose.runtime.collectAsState
@@ -36,13 +39,16 @@ fun PracticeScreen(
     // --- Спостерігаємо за Станами ViewModel ---
     val currentPracticePhase by viewModel.practicePhase.collectAsState()
     val currentCardState by viewModel.currentCardState.collectAsState()
-    // !!! Спостерігаємо за новим станом PromptContentType !!!
     val currentWordPromptContentType by viewModel.currentWordPromptContentType.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
 
     // Спостерігаємо за поточною партією та індексом
     val currentBatchWords by viewModel.currentBatch.collectAsState()
     val currentWordIndex by viewModel.currentWordIndexInBatch.collectAsState()
+
+    // !!! Спостерігаємо за станом можливості скасування з ViewModel !!!
+    val canUndo by viewModel.canUndo.collectAsState()
+
 
     // Обчислюємо поточне слово локально
     val currentWordInBatch = remember(currentBatchWords, currentWordIndex) {
@@ -53,12 +59,10 @@ fun PracticeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScopeSnackbar = rememberCoroutineScope()
 
-    // Логування зміни CardState у PracticeScreen (для налагодження)
     LaunchedEffect(currentCardState) {
         Log.d("CardStateDebug", "PracticeScreen: currentCardState ViewModel змінився на $currentCardState")
     }
 
-    // --- LaunchedEffect для Повідомлень про Помилки (показуємо Snackbar) ---
     LaunchedEffect(errorMessage) {
         errorMessage?.let { message ->
             coroutineScopeSnackbar.launch {
@@ -71,7 +75,6 @@ fun PracticeScreen(
         }
     }
 
-    // --- Обробник системної кнопки "Назад" ---
     BackHandler(enabled = currentPracticePhase !is PracticePhase.Loading) {
         onBack()
     }
@@ -83,6 +86,17 @@ fun PracticeScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack, enabled = currentPracticePhase !is PracticePhase.Loading) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = { viewModel.undoLastAction() },
+                        enabled = canUndo
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.left_arrow_return_svgrepo_com),
+                            contentDescription = "Скасувати останню дію"
+                        )
                     }
                 }
             )
@@ -113,26 +127,26 @@ fun PracticeScreen(
                         viewModel.onPairingFinished()
                     },
                     onSpeakTranslationClick = { translationText ->
-                        viewModel.speakTranslationText(translationText) // Викликаємо універсальну функцію озвучення
+                        viewModel.speakTranslationText(translationText)
                     },
                     modifier = Modifier.padding(paddingValues)
                 )
             }
 
             is PracticePhase.BatchRegular -> {
-                Log.d("BatchDebug", "PracticeScreen відображає BatchRegular. Поточний індекс слова: ${currentWordIndex}, Розмір партії: ${currentBatchWords.size}, Слово: $currentWordInBatch")
+                Log.d("BatchDebug", "PracticeScreen відображає BatchRegular. Поточний індекс слова: ${currentWordIndex}, Розмір партії: ${currentBatchWords.size}, Слово: ${currentWordInBatch?.text}") // Added ?.text for safety
                 Log.d("CardStateDebug", "PracticeScreen відображає BatchRegular. Поточний cardState: $currentCardState, PromptContentType: $currentWordPromptContentType")
 
 
                 RegularPracticeUI(
                     word = currentWordInBatch,
-                    cardState = currentCardState, // Передаємо стан картки (Prompt/Answer)
-                    promptContentType = currentWordPromptContentType, // !!! Передаємо тип вмісту для Prompt сторони !!!
+                    cardState = currentCardState,
+                    promptContentType = currentWordPromptContentType,
                     onFlipCard = { viewModel.flipCard() },
                     onCardSwipedLeft = { viewModel.onCardSwipedLeft() },
                     onCardSwipedRight = { viewModel.onCardSwipedRight() },
                     onSpeakTranslationClick = { translationText ->
-                        viewModel.speakTranslationText(translationText) // Викликаємо універсальну функцію озвучення
+                        viewModel.speakTranslationText(translationText)
                     },
                     modifier = Modifier.padding(paddingValues)
                 )

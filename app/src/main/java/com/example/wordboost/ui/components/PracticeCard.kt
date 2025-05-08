@@ -1,6 +1,8 @@
+// ui.components/PracticeCard.kt
 package com.example.wordboost.ui.components
+
 import android.util.Log
-import androidx.compose.animation.core.Animatable // !!! Імпорт Animatable !!!
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
@@ -22,63 +24,72 @@ import com.example.wordboost.viewmodel.PromptContentType
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
+// Припускаємо, що ці Composable визначені в цьому ж файлі
+
+// --- Допоміжна функція для вмісту Prompt сторони картки (Оновлено: Тільки один текст) ---
 @Composable
 fun FrontCardFace(
     word: Word,
     isTranslationPrimary: Boolean, // Визначає, що показувати: Переклад чи Оригінал
-    onSpeakTranslationClick: () -> Unit, // Колбек для озвучення (активний лише для Перекладу)
+    onSpeakTranslationClick: () -> Unit, // Колбек для озвучення (активний лише якщо primary - переклад)
     modifier: Modifier = Modifier // Apply modifier from parent
 ) {
+    // Вибираємо лише один текст для показу на лицьовій стороні
     val primaryText = if (isTranslationPrimary) word.translation else word.text
 
-    Log.d("CardStateDebug", "FrontCardFace recomposing. Word: ${word.text}, isTranslationPrimary: $isTranslationPrimary. Showing only primary text.")
+    Log.d("CardStateDebug", "FrontCardFace recomposing. Word: ${word.text}, isTranslationPrimary: $isTranslationPrimary. Showing only primary text: '$primaryText'")
 
     Box(modifier = modifier.padding(16.dp).fillMaxSize(), contentAlignment = Alignment.Center) {
         if (primaryText.isNotBlank()) {
-            if (isTranslationPrimary) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    IconButton(
-                        onClick = onSpeakTranslationClick,
-                        modifier = Modifier.size(48.dp)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) { // Вирівнюємо по центру, якщо текст з іконкою
+                if (isTranslationPrimary) {
+                    // Якщо primary - це переклад, показуємо його з іконкою озвучення
+                    Row(
+                        modifier = Modifier.fillMaxWidth(), // Рядок займає всю ширину
+                        verticalAlignment = Alignment.CenterVertically, // Вирівнювання елементів в рядку
+                        horizontalArrangement = Arrangement.Center // Розподіл елементів в рядку
                     ) {
-                        Icon(
-                            imageVector = ImageVector.vectorResource(id = R.drawable.volume_up_svgrepo_com),
-                            contentDescription = "Прослухати переклад",
-                            tint = MaterialTheme.colorScheme.primary
+                        IconButton(
+                            onClick = onSpeakTranslationClick, // Озвучуємо цей текст
+                            modifier = Modifier.size(48.dp) // Розмір іконки
+                        ) {
+                            Icon(
+                                imageVector = ImageVector.vectorResource(id = R.drawable.volume_up_svgrepo_com),
+                                contentDescription = "Прослухати переклад",
+                                tint = MaterialTheme.colorScheme.primary // Колір іконки з теми
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp)) // Відступ між іконкою та текстом
+                        Text(
+                            text = primaryText, // Тільки переклад
+                            style = MaterialTheme.typography.displaySmall, // Стиль тексту з теми
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.weight(1f, fill = false) // Текст займає доступний простір без розтягування
                         )
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+                } else {
+                    // Якщо primary - це оригінал, показуємо тільки текст
                     Text(
-                        text = primaryText,
-                        style = MaterialTheme.typography.displaySmall,
+                        text = primaryText, // Тільки оригінал
+                        style = MaterialTheme.typography.displaySmall, // Стиль тексту з теми
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.weight(1f, fill = false)
                     )
                 }
-            } else {
-                Text(
-                    text = primaryText,
-                    style = MaterialTheme.typography.displaySmall,
-                    textAlign = TextAlign.Center,
-                )
             }
         } else {
             Log.w("CardStateDebug", "FrontCardFace: Primary text is blank for word ${word.text}")
-            Text("Немає тексту для відображення", style = MaterialTheme.typography.bodySmall)
+            Text("Немає тексту для відображення", style = MaterialTheme.typography.bodySmall) // Менший стиль для повідомлення
         }
     }
 }
 
-// --- Допоміжний Composable для вмісту Answer сторони картки (ЗАВЖДИ Обидва Тексти) ---
+// --- Допоміжна функція для вмісту Answer сторони картки (ЗАВЖДИ Обидва Тексти) ---
+// Цей Composable залишається БЕЗ ЗМІН
 @Composable
 fun BackCardFace(
     word: Word,
     onSpeakTranslationClick: () -> Unit,
-    modifier: Modifier = Modifier // Apply modifier from parent
+    modifier: Modifier = Modifier
 ) {
     val originalText = word.text
     val translationText = word.translation
@@ -86,21 +97,24 @@ fun BackCardFace(
     Log.d("CardStateDebug", "BackCardFace recomposing. Word: ${word.text}, showing Both Texts (Answer)")
 
     Box(
-        modifier = modifier.padding(16.dp),
+        modifier = modifier.padding(16.dp), // Внутрішній відступ картки
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.graphicsLayer { rotationY = 180f } // Correct compensation here
+            modifier = Modifier
+                .fillMaxWidth() // Заповнюємо всю доступну ширину
+                .graphicsLayer { rotationY = 180f } // Компенсація повороту вмісту зворотньої сторони
         ) {
             if (originalText.isNotBlank()) {
                 Text(
-                    text = originalText,
-                    style = MaterialTheme.typography.displaySmall,
+                    text = originalText, // Оригінал
+                    style = MaterialTheme.typography.headlineMedium, // Стиль для оригіналу на зворотній стороні
                     textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface // Колір тексту з теми
                 )
                 if (translationText.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp)) // Відступ між текстами
                 }
             } else {
                 Log.w("CardStateDebug", "BackCardFace: Original text is blank for word ${word.text}")
@@ -114,28 +128,28 @@ fun BackCardFace(
                     horizontalArrangement = Arrangement.Center
                 ) {
                     IconButton(
-                        onClick = onSpeakTranslationClick,
-                        modifier = Modifier.size(48.dp)
+                        onClick = onSpeakTranslationClick, // Озвучення перекладу
+                        modifier = Modifier.size(48.dp) // Розмір іконки
                     ) {
                         Icon(
                             imageVector = ImageVector.vectorResource(id = R.drawable.volume_up_svgrepo_com),
                             contentDescription = "Прослухати переклад",
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.primary // Колір іконки з теми
                         )
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(8.dp)) // Відступ між іконкою та текстом
                     Text(
-                        text = translationText,
-                        style = MaterialTheme.typography.headlineMedium,
+                        text = translationText, // Переклад
+                        style = MaterialTheme.typography.headlineMedium, // Стиль для перекладу на зворотній стороні
                         textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, // Колір з теми (можна використати primary)
                         modifier = Modifier.weight(1f, fill = false)
                     )
                 }
             } else {
                 Log.w("CardStateDebug", "BackCardFace: Translation text is blank for word ${word.text}")
                 if (originalText.isBlank()) {
-                    Text("Немає тексту для відображення", style = MaterialTheme.typography.bodySmall)
+                    Text("Немає тексту для відображення", style = MaterialTheme.typography.bodySmall) // Менший стиль
                 }
             }
         }
@@ -148,7 +162,7 @@ fun PracticeCard(
     word: Word,
     cardState: CardState,
     promptContentType: PromptContentType,
-    onReplayTranslationClick: () -> Unit,
+    onReplayTranslationClick: () -> Unit, // Колбек для озвучення
     modifier: Modifier = Modifier
 ) {
     Log.d("CardStateDebug", "PracticeCard перекомпоновується. Слово: ${word.text}, cardState: $cardState, promptContentType: $promptContentType")
@@ -156,20 +170,17 @@ fun PracticeCard(
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
 
-    val rotation = remember(word.id) { Animatable(0f) } // Add word.id as key
+    val rotation = remember(word.id) { Animatable(0f) }
 
 
     LaunchedEffect(word.id) {
         Log.d("CardStateDebug", "PracticeCard: Слово змінилось (ID: ${word.id}). Миттєво скидаємо поворот до 0.")
-        // Одразу встановлюємо початкове значення анімації в 0
         rotation.snapTo(0f)
     }
 
 
-    // Ефект для АНІМАЦІЇ повороту при зміні CardState (клік користувача)
     LaunchedEffect(cardState) {
         val targetRotation = if (cardState == CardState.Answer) 180f else 0f
-        // Якщо поточний кут вже дуже близький до цільового, не анімуємо
         if (rotation.value.equals(targetRotation)) {
             Log.d("CardStateDebug", "PracticeCard: CardState змінився на $cardState, але вже на цільовому куті ($targetRotation). Не анімуємо.")
             return@LaunchedEffect
@@ -177,7 +188,7 @@ fun PracticeCard(
 
         Log.d("CardStateDebug", "PracticeCard: CardState змінився на $cardState. Анімуємо до $targetRotation.")
         coroutineScope.launch {
-            rotation.animateTo( // Анімуємо поточне значення Animatable
+            rotation.animateTo(
                 targetValue = targetRotation,
                 animationSpec = tween(500)
             )
@@ -194,16 +205,19 @@ fun PracticeCard(
                 Log.d("CardStateDebug", "graphicsLayer: rotationY=${this.rotationY}, cameraDistance=${this.cameraDistance}")
             },
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(8.dp)
+        elevation = CardDefaults.cardElevation(8.dp),
+        // !!! Змінено колір фону картки на surfaceBright !!!
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceBright)
     ) {
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Використовуємо поточне значення кута для визначення візуальної сторони
             val currentRotationValue = rotation.value
             val normalizedRotation = currentRotationValue % 360f
             val positiveNormalizedRotation = if (normalizedRotation < 0) normalizedRotation + 360 else normalizedRotation
 
+            // Визначаємо, яка сторона "видима" на основі кута повороту
+            // Кут від 0 до 90 (або від 270 до 360) показує передню сторону
             val isVisualPromptFace = positiveNormalizedRotation <= 90f || positiveNormalizedRotation >= 270f
 
 
@@ -212,24 +226,28 @@ fun PracticeCard(
                 FrontCardFace(
                     word = word,
                     isTranslationPrimary = promptContentType == PromptContentType.Translation,
-                    onSpeakTranslationClick = onReplayTranslationClick,
+                    onSpeakTranslationClick = onReplayTranslationClick, // Передаємо колбек озвучення
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            this.rotationY = 0f // Вміст передньої сторони не обертається відносно картки
-                            alpha = if (isVisualPromptFace) 1f else 0f // Керуємо видимістю
+                            // Зворотній поворот вмісту FrontCardFace
+                            this.rotationY = 0f
+                            // Керуємо видимістю для уникнення мерехтіння
+                            alpha = if (isVisualPromptFace) 1f else 0f
                         }
                 )
             } else {
                 Log.d("CardStateDebug", "Showing BackCardFace. Current Rotation: $currentRotationValue, Normalized: $positiveNormalizedRotation, isVisualPromptFace: $isVisualPromptFace")
                 BackCardFace(
                     word = word,
-                    onSpeakTranslationClick = onReplayTranslationClick,
+                    onSpeakTranslationClick = onReplayTranslationClick, // Передаємо колбек озвучення
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            // Вміст зворотньої сторони має свою компенсацію повороту всередині BackCardFace
-                            alpha = if (!isVisualPromptFace) 1f else 0f // Керуємо видимістю
+                            // Зворотній поворот вмісту BackCardFace (вже є всередині Composable)
+                            // graphicsLayer { rotationY = 180f } у BackCardFace
+                            // Керуємо видимістю
+                            alpha = if (!isVisualPromptFace) 1f else 0f
                         }
                 )
             }

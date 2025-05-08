@@ -8,6 +8,7 @@ import com.example.wordboost.ui.components.isValidPassword
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+
 sealed class LoginEvent {
     object Success : LoginEvent()
     data class Failure(val message: String?) : LoginEvent()

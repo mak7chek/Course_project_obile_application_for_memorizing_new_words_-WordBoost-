@@ -1,39 +1,41 @@
-package com.example.wordboost.ui.components;
+package com.example.wordboost.ui.components // Ваш пакет
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.wordboost.data.model.Group
+import com.example.wordboost.data.model.Group // Переконайтесь в імпорті Group
+
 @Composable
-fun GroupSelectionDropdown(
+fun GroupFilterDropdown(
     groups: List<Group>,
     selectedGroupId: String?,
     onGroupSelected: (String?) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val selectedGroupName = when (selectedGroupId) {
-        null -> "Без групи"
-        else -> groups.find { it.id == selectedGroupId }?.name ?: "Виберіть групу"
-    }
+    val allGroupsOption = Group(id = "all_groups_filter", name = "Всі групи")
+    val groupsWithOptions = listOf(allGroupsOption) + groups
+
+    val selectedGroupName = groupsWithOptions.find { it.id == selectedGroupId }?.name ?: "Всі групи"
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .height(56.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp) // Горизонтальний та вертикальний відступ
             .clickable { expanded = true },
         contentAlignment = Alignment.CenterStart
     ) {
         OutlinedButton(
             onClick = { expanded = true },
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp)
+            // !!! ЗМІНЕНО: Заповнюємо тільки ШИРИНУ батьківського Box !!!
+            modifier = Modifier.fillMaxWidth(), // Кнопка заповнює ШИРИНУ Box
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            shape = MaterialTheme.shapes.medium
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -55,22 +57,11 @@ fun GroupSelectionDropdown(
             onDismissRequest = { expanded = false },
             modifier = Modifier.width(200.dp)
         ) {
-
-            DropdownMenuItem(
-                text = { Text("Без групи", maxLines = 1) },
-                onClick = {
-                    onGroupSelected(null)
-                    expanded = false
-                }
-            )
-            Divider()
-
-
-            groups.forEach { group ->
+            groupsWithOptions.forEach { group ->
                 DropdownMenuItem(
                     text = { Text(group.name, maxLines = 1) },
                     onClick = {
-                        onGroupSelected(group.id)
+                        onGroupSelected(if (group.id == "all_groups_filter") null else group.id)
                         expanded = false
                     }
                 )

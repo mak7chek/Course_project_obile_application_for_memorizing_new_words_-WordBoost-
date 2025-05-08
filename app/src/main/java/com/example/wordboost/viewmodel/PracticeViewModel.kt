@@ -1,4 +1,3 @@
-// Corrected PracticeViewModel.kt
 package com.example.wordboost.viewmodel
 
 import androidx.lifecycle.ViewModel
@@ -23,6 +22,9 @@ import kotlin.math.min
 import android.util.Log
 import kotlin.random.Random
 
+import com.example.wordboost.data.util.Stack
+
+
 sealed class PracticePhase {
     object Loading : PracticePhase()
     data class BatchPairing(val wordsInBatch: List<Word>) : PracticePhase()
@@ -41,6 +43,25 @@ enum class CardState {
     Prompt,
     Answer
 }
+
+data class WordMemento(
+    val wordId: String,
+    val repetition: Int,
+    val easiness: Float,
+    val interval: Long,
+    val lastReviewed: Long,
+    val nextReview: Long,
+    val status: String
+)
+
+data class UndoState(
+    val phase: PracticePhase,
+    val batch: List<Word>,
+    val wordIndexInBatch: Int,
+    val cardState: CardState,
+    val wordBeforeAction: WordMemento? = null
+)
+
 
 class PracticeViewModel(
     private val practiceRepository: PracticeRepository,
@@ -78,6 +99,10 @@ class PracticeViewModel(
 
     private val batchSize = 5
 
+    private val undoStack = Stack<UndoState>()
+    private val _canUndo = MutableStateFlow(false)
+    val canUndo: StateFlow<Boolean> = _canUndo.asStateFlow()
+
 
     init {
         collectWordsForPractice()
@@ -97,6 +122,8 @@ class PracticeViewModel(
         _practicePhase.value = PracticePhase.Loading
         _errorMessage.value = null
         totalPracticedCount = 0
+        undoStack.clear()
+        _canUndo.value = false
 
         viewModelScope.launch {
             try {
@@ -106,26 +133,30 @@ class PracticeViewModel(
                         _allWordsForSession.value = words
 
                         val currentPhase = _practicePhase.value
-
                         if (words.isNotEmpty() && (currentPhase == PracticePhase.Loading ||
                                     currentPhase is PracticePhase.Finished ||
                                     currentPhase is PracticePhase.Empty ||
                                     (currentPhase is PracticePhase.BatchPairing && _currentBatch.value.isEmpty()) ||
                                     (currentPhase is PracticePhase.BatchRegular && _currentBatch.value.isEmpty())))
                         {
-                            Log.d("PracticeVM", "Starting next batch after Flow update.")
+                            if (!(currentPhase == PracticePhase.Loading && words.isEmpty())) {
+                                pushStateForUndo(null)
+                                Log.d("UndoDebug", "Pushing phase state before starting next batch/phase transition (Flow collect).")
+                            } else {
+                                Log.d("UndoDebug", "Not pushing state from Loading to Empty.")
+                            }
                             startNextPracticeBatch()
                         } else if (words.isEmpty() && (currentPhase == PracticePhase.Loading || currentPhase is PracticePhase.BatchPairing || currentPhase is PracticePhase.BatchRegular)) {
                             if (_currentBatch.value.isEmpty()) {
-                                Log.d("PracticeVM", "No words in Flow, and current batch empty. Transitioning to Empty phase.")
-                                _practicePhase.value = PracticePhase.Empty
-                            } else {
-                                Log.d("PracticeVM", "No words in Flow, but current batch still has items (${_currentBatch.value.size}). Staying in current phase.")
+                                pushStateForUndo(null)
+                                Log.d("UndoDebug", "Pushing phase state before transitioning to Empty/Finished (Flow collect).")
+                                _practicePhase.value = if (totalPracticedCount > 0) PracticePhase.Finished(totalPracticedCount) else PracticePhase.Empty
                             }
                         } else {
-                            Log.d("PracticeVM", "Flow update received, but not triggering batch start. Current phase: $currentPhase, words in flow: ${words.size}, words in current batch: ${_currentBatch.value.size}")
                             if (currentPhase == PracticePhase.Loading && words.isEmpty()) {
                                 Log.d("PracticeVM", "Loading finished, no words in Flow. Transitioning to Empty phase.")
+                                pushStateForUndo(null)
+                                Log.d("UndoDebug", "Pushing phase state before transitioning from Loading to Empty.")
                                 _practicePhase.value = PracticePhase.Empty
                             }
                         }
@@ -133,6 +164,8 @@ class PracticeViewModel(
             } catch (e: Exception) {
                 Log.e("PracticeVM", "Error collecting words for practice: ${e.message}", e)
                 _practicePhase.value = PracticePhase.Error("Помилка завантаження слів: ${e.message}")
+                undoStack.clear()
+                _canUndo.value = false
             }
         }
     }
@@ -140,7 +173,7 @@ class PracticeViewModel(
 
     fun flipCard() {
         Log.d("PracticeVM", "flipCard: Called. Current CardState: ${_currentCardState.value}")
-        ttsService.stop() // Stop TTS when flipping
+        ttsService.stop()
         Log.d("TTS_DEBUG", "Manual Stop: Озвучення зупинено з flipCard().")
 
         _currentCardState.value = when (_currentCardState.value) {
@@ -156,10 +189,10 @@ class PracticeViewModel(
         val remainingWords = _allWordsForSession.value
 
         if (remainingWords.isEmpty()) {
+
             _currentBatch.value = emptyList()
-            _practicePhase.value = PracticePhase.Empty
-            Log.d("PracticeVM", "startNextPracticeBatch: No remaining words in _allWordsForSession. Transitioning to Empty.")
-            ttsService.stop() // Stop TTS when batch starts and list is empty
+            Log.d("PracticeVM", "startNextPracticeBatch: No remaining words in _allWordsForSession. Flow collector should handle phase.")
+            ttsService.stop()
             Log.d("TTS_DEBUG", "Manual Stop: Озвучення зупинено з startNextPracticeBatch() (empty).")
             return
         }
@@ -175,8 +208,7 @@ class PracticeViewModel(
             if (currentPhase == PracticePhase.Loading || currentPhase is PracticePhase.BatchRegular) {
                 _practicePhase.value = PracticePhase.BatchPairing(nextBatch)
                 Log.d("PracticeVM", "startNextPracticeBatch: Starting BatchPairing with ${nextBatch.size} words.")
-            } // else if currentPhase is BatchPairing, transition happens in onPairingFinished
-
+            }
 
             _currentCardState.value = CardState.Prompt
             setRandomPromptContentType()
@@ -184,18 +216,19 @@ class PracticeViewModel(
             Log.d("PracticeVM", "startNextPracticeBatch: Initial CardState set to Prompt. PromptContentType: ${_currentWordPromptContentType.value}.")
 
         } else {
+            Log.w("PracticeVM", "startNextPracticeBatch: Logic error, batch was empty despite words in _allWordsForSession. Flow collect should handle phase.")
             _currentBatch.value = emptyList()
-            _practicePhase.value = PracticePhase.Empty
-            Log.w("PracticeVM", "startNextPracticeBatch: Logic error, batch was empty despite words in _allWordsForSession. Transitioning to Empty.")
         }
 
-        ttsService.stop() // Stop TTS when batch starts (even if not empty)
+        ttsService.stop()
         Log.d("TTS_DEBUG", "Manual Stop: Озвучення зупинено з startNextPracticeBatch().")
     }
 
 
     fun onPairingFinished() {
         Log.d("PracticeVM", "onPairingFinished: Pairing finished for current batch. Moving to Regular phase.")
+        pushStateForUndo(null)
+        Log.d("UndoDebug", "Pushing phase state before onPairingFinished() transition to Regular.")
         if (_currentBatch.value.isNotEmpty()) {
             _practicePhase.value = PracticePhase.BatchRegular(_currentBatch.value)
             _currentWordIndexInBatch.value = 0
@@ -203,12 +236,12 @@ class PracticeViewModel(
             _currentCardState.value = CardState.Prompt
             setRandomPromptContentType()
 
-            ttsService.stop() // Stop TTS when transitioning to Regular phase
-            Log.d("TTS_DEBUG", "Manual Stop: Озвучення зупинено з onPairingFinished().")
+            ttsService.stop()
+            Log.d("TTS_DEBUG", "Manual Stop: Озвучуємо зупинено з onPairingFinished().")
             Log.d("PracticeVM", "onPairingFinished: Transitioned to BatchRegular.")
         } else {
             Log.w("PracticeVM", "onPairingFinished: Current batch is empty, cannot transition to Regular. Checking for next batch.")
-            startNextPracticeBatch()
+
         }
     }
 
@@ -222,24 +255,58 @@ class PracticeViewModel(
         } else {
             Log.e("PracticeVM", "onPairMatched: Matched word with ID $wordId not found in current batch.")
         }
-        // !!! Do NOT call speakTranslationText or stop() here automatically on match !!!
-        // The UI (PairingGameUI) might call speakTranslationText when a word is clicked for preview.
     }
 
 
     fun onCardSwipedLeft() {
         Log.d("PracticeVM", "onCardSwipedLeft: Card swiped LEFT.")
-        val currentWord = _currentBatch.value.getOrNull(_currentWordIndexInBatch.value) ?: return
-        val quality = 2
-        processAnswerAndUpdateWord(currentWord, quality)
+        val currentWord = _currentBatch.value.getOrNull(_currentWordIndexInBatch.value)
+        if (currentWord != null) {
+            pushStateForUndo(createWordMemento(currentWord))
+            Log.d("UndoDebug", "Pushing state before onCardSwipedLeft() for word ${currentWord.text}.")
+            val quality = 2
+            processAnswerAndUpdateWord(currentWord, quality)
+        } else {
+            Log.w("PracticeVM", "onCardSwipedLeft: No current word to process.")
+        }
     }
 
     fun onCardSwipedRight() {
         Log.d("PracticeVM", "onCardSwipedRight: Card swiped RIGHT.")
-        val currentWord = _currentBatch.value.getOrNull(_currentWordIndexInBatch.value) ?: return
-        val quality = 5
-        processAnswerAndUpdateWord(currentWord, quality)
+        val currentWord = _currentBatch.value.getOrNull(_currentWordIndexInBatch.value)
+        if (currentWord != null) {
+            pushStateForUndo(createWordMemento(currentWord))
+            Log.d("UndoDebug", "Pushing state before onCardSwipedRight() for word ${currentWord.text}.")
+            val quality = 5
+            processAnswerAndUpdateWord(currentWord, quality)
+        } else {
+            Log.w("PracticeVM", "onCardSwipedRight: No current word to process.")
+        }
     }
+
+    private fun createWordMemento(word: Word): WordMemento {
+        return WordMemento(
+            wordId = word.id,
+            repetition = word.repetition,
+            easiness = word.easiness,
+            interval = word.interval,
+            lastReviewed = word.lastReviewed,
+            nextReview = word.nextReview,
+            status = word.status
+        )
+    }
+
+    private fun restoreWordFromMemento(word: Word, memento: WordMemento): Word {
+        return word.copy(
+            repetition = memento.repetition,
+            easiness = memento.easiness,
+            interval = memento.interval,
+            lastReviewed = memento.lastReviewed,
+            nextReview = memento.nextReview,
+            status = memento.status
+        )
+    }
+
 
     private fun processAnswerAndUpdateWord(word: Word, quality: Int) {
         Log.d("PracticeVM", "processAnswerAndUpdateWord: Processing answer for word ${word.text} with quality $quality.")
@@ -249,26 +316,43 @@ class PracticeViewModel(
 
         Log.d("BatchDebug", "processAnswerAndUpdateWord: Called for word ${word.text} with quality $quality. Index before: $indexBeforeProcessing, Batch size before: $currentBatchSizeBeforeProcessing, Phase before: $currentPhaseBeforeProcessing")
 
+        val (rep, ef, interval) = PracticeUtils.sm2(
+            word.repetition, word.easiness, word.interval, quality
+        )
+        val now = System.currentTimeMillis()
+        val next = now + interval
+        val status = PracticeUtils.determineStatus(rep, interval)
+        val updatedWord = word.copy(
+            repetition = rep,
+            easiness = ef,
+            interval = interval,
+            lastReviewed = now,
+            nextReview = next,
+            status = status
+        )
+
 
         viewModelScope.launch {
-            practiceRepository.updateWordAfterPractice(word, quality) { // Callback after Firebase save
-                Log.d("PracticeVM", "Word ${word.text} updated successfully in Firebase with quality $quality.")
-
+            practiceRepository.saveWord(updatedWord) {
+                Log.d("PracticeVM", "Word ${updatedWord.text} updated successfully in Firebase with quality $quality via saveWord.")
 
                 if (currentPhaseBeforeProcessing is PracticePhase.BatchRegular) {
                     val nextIndexInBatch = indexBeforeProcessing + 1
 
                     if (nextIndexInBatch >= currentBatchSizeBeforeProcessing) {
-                        Log.d("PracticeVM", "processAnswerAndUpdateWord (Callback): Finished current batch in Regular phase. Index $nextIndexInBatch vs Batch size $currentBatchSizeBeforeProcessing. Starting next batch.")
+                        Log.d("PracticeVM", "processAnswerAndUpdateWord (Callback): Finished current batch in Regular phase. Index $nextIndexInBatch vs Batch size $currentBatchSizeBeforeProcessing. Starting next batch via Flow update.")
                         _currentBatch.value = emptyList()
+                        _currentWordIndexInBatch.value = 0
+
                         ttsService.stop()
                         Log.d("TTS_DEBUG", "Manual Stop: Озвучення зупинено з processAnswerAndUpdateWord() (End of Regular Batch).")
+
                     } else {
+                        Log.d("PracticeVM", "processAnswerAndUpdateWord (Callback): Moving to next word in batch in Regular phase. Index: $nextIndexInBatch.")
                         _currentWordIndexInBatch.value = nextIndexInBatch
                         _currentCardState.value = CardState.Prompt
                         setRandomPromptContentType()
 
-                        Log.d("PracticeVM", "processAnswerAndUpdateWord (Callback): Moving to next word in batch in Regular phase. Index: $nextIndexInBatch. CardState set to: ${_currentCardState.value}. PromptContentType: ${_currentWordPromptContentType.value}.")
                         ttsService.stop()
                         Log.d("TTS_DEBUG", "Manual Stop: Озвучення зупинено з processAnswerAndUpdateWord() (Next Regular Word).")
                     }
@@ -276,18 +360,84 @@ class PracticeViewModel(
                 } else if (currentPhaseBeforeProcessing is PracticePhase.BatchPairing) {
                     Log.d("PracticeVM", "processAnswerAndUpdateWord (Callback): Processed word in Pairing phase. Not moving to next word here.")
                     totalPracticedCount++
-
                 } else {
                     Log.d("PracticeVM", "processAnswerAndUpdateWord (Callback): Processed word in unexpected phase: $currentPhaseBeforeProcessing.")
                 }
-
             }
         }
     }
 
+    private fun pushStateForUndo(wordMemento: WordMemento?) {
+        val stateToPush = UndoState(
+            phase = _practicePhase.value,
+            batch = _currentBatch.value,
+            wordIndexInBatch = _currentWordIndexInBatch.value,
+            cardState = _currentCardState.value,
+            wordBeforeAction = wordMemento
+        )
+        undoStack.push(stateToPush)
+        _canUndo.value = undoStack.isNotEmpty()
+        Log.d("UndoDebug", "State pushed to stack. Stack size: ${undoStack.size()}")
+        Log.d("UndoDebug", "Pushed State: Phase=${stateToPush.phase}, BatchSize=${stateToPush.batch.size}, Index=${stateToPush.wordIndexInBatch}, CardState=${stateToPush.cardState}, WordMemento=${stateToPush.wordBeforeAction?.wordId}")
+    }
+
+
+    fun undoLastAction() {
+        val lastState = undoStack.pop()
+        if (lastState != null) {
+            Log.d("UndoDebug", "Popped state from stack. Restoring...")
+            Log.d("UndoDebug", "Restoring State: Phase=${lastState.phase}, BatchSize=${lastState.batch.size}, Index=${lastState.wordIndexInBatch}, CardState=${lastState.cardState}, WordMemento=${lastState.wordBeforeAction?.wordId}")
+
+            _practicePhase.value = lastState.phase
+            _currentBatch.value = lastState.batch
+            _currentWordIndexInBatch.value = lastState.wordIndexInBatch
+
+            if (lastState.phase is PracticePhase.BatchRegular) {
+                _currentCardState.value = CardState.Answer
+                setRandomPromptContentType()
+            } else {
+                _currentCardState.value = lastState.cardState
+                if (lastState.cardState == CardState.Prompt) {
+                    setRandomPromptContentType()
+                }
+            }
+
+            lastState.wordBeforeAction?.let { memento ->
+                viewModelScope.launch {
+                    val wordToRestore = _allWordsForSession.value.find { it.id == memento.wordId }
+                        ?: _currentBatch.value.find { it.id == memento.wordId }
+                        ?: practiceRepository.getWordById(memento.wordId)
+
+                    if (wordToRestore != null) {
+                        val restoredWord = restoreWordFromMemento(wordToRestore, memento)
+                        Log.d("UndoDebug", "Attempting to restore word ${restoredWord.text} with state: Rep=${restoredWord.repetition}, EF=${restoredWord.easiness}, Interval=${restoredWord.interval}, Status=${restoredWord.status}")
+
+                        practiceRepository.saveWord(restoredWord) {
+                            Log.d("UndoDebug", "Word ${restoredWord.text} state restored in Firebase successfully.")
+                        }
+                    } else {
+                        Log.e("UndoDebug", "Word with ID ${memento.wordId} not found in current session words, batch, or repository for restoring.")
+                        _errorMessage.value = "Не вдалося скасувати дію: слово для відновлення не знайдено."
+                    }
+                }
+            }
+
+
+            _canUndo.value = undoStack.isNotEmpty()
+            ttsService.stop()
+            Log.d("TTS_DEBUG", "Manual Stop: Озвучення зупинено з undoLastAction().")
+
+
+        } else {
+            Log.d("UndoDebug", "Undo stack is empty. No action to undo.")
+            _errorMessage.value = "Немає дій для скасування."
+        }
+    }
+
+
     fun speakTranslationText(translationText: String) {
         Log.d("TTS_DEBUG", "speakTranslationText: ВИКЛИК З ТЕКСТОМ: '$translationText'")
-        ttsService.stop() // Always stop previous speech before starting new
+        ttsService.stop()
         Log.d("TTS_DEBUG", "speakTranslationText: Попереднє озвучення зупинено.")
 
         if (translationText.isNotBlank()) {
