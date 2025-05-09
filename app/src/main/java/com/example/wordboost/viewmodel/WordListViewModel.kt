@@ -67,17 +67,34 @@ class WordListViewModel(
 
     val wordsToLearnNowCount: StateFlow<Int> = _allWords.map { words ->
         val currentTime = System.currentTimeMillis()
-        words.count { it.nextReview <= currentTime && it.status != "learned" }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, 0)
+        val count = words.count { it.nextReview <= currentTime && it.status != "mastered" }
+        Log.d("WordListVM_Counts", "wordsToLearnNowCount: allWords.size=${words.size}, dueCount=$count") // Додай логування
+        count
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000L), // Змінено з Lazily
+        initialValue = 0
+    )
 
     val wordsInShortTermMemoryCount: StateFlow<Int> = _allWords.map { words ->
         val currentTime = System.currentTimeMillis()
-        words.count { it.nextReview > currentTime && it.status != "learned" && it.repetition > 0 }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, 0)
-
+        val count = words.count { it.nextReview > currentTime && it.status != "mastered" && it.repetition > 0 }
+        Log.d("WordListVM_Counts", "wordsInShortTermMemoryCount: allWords.size=${words.size}, count=$count") // Додай логування
+        count
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000L), // Змінено з Lazily
+        initialValue = 0
+    )
     val learnedWordsCount: StateFlow<Int> = _allWords.map { words ->
-        words.count { it.status == "learned" }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, 0)
+        val count = words.count { it.status == "mastered" }
+        Log.d("WordListVM_Counts", "learnedWordsCount: allWords.size=${words.size}, count=$count") // Додай логування
+        count
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000L), // Змінено з Lazily
+        initialValue = 0
+    )
 
 
     init {
@@ -105,7 +122,6 @@ class WordListViewModel(
         groupsListenerRegistration?.remove()
         groupsListenerRegistration = repository.getGroups { fetchedGroups ->
             val groupsWithFilters = mutableListOf<Group>()
-            groupsWithFilters.add(Group(id = "", name = "Всі групи"))
             groupsWithFilters.add(Group(id = "no_group_filter", name = "Без групи"))
             groupsWithFilters.addAll(fetchedGroups)
             _groups.value = groupsWithFilters
@@ -171,9 +187,9 @@ class WordListViewModel(
             repetition = 0,
             easiness = 2.5f,
             interval = 0L,
-            lastReviewed = 0L,
+            lastReviewed = 0,
             nextReview = System.currentTimeMillis(),
-            status = PracticeUtils.determineStatus(0, 0L)
+            status = "learning"
         )
         _isLoading.value = true
         repository.saveWord(resetWord) { success ->

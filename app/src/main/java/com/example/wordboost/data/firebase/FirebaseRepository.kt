@@ -21,71 +21,78 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
 
     private val db = Firebase.firestore
     private fun getUserWordsCollection() = authRepository.getCurrentUser()?.uid?.let { userId ->
+        Log.i("FirebaseRepo_User", "getUserWordsCollection: Accessing words for userId: $userId") // ДОДАНО ЛОГ
         db.collection("users").document(userId).collection("words")
     } ?: run {
-        Log.e("FirebaseRepo", "User not logged in or ID is null when trying to access words collection!")
+        Log.e("FirebaseRepo_User", "getUserWordsCollection: User not logged in or ID is null!") // ДОДАНО ЛОГ
         null
     }
 
     private fun getUserGroupsCollection() = authRepository.getCurrentUser()?.uid?.let { userId ->
+        Log.i("FirebaseRepo_User", "getUserGroupsCollection: Accessing groups for userId: $userId")
         db.collection("users").document(userId).collection("groups")
     } ?: run {
-        Log.e("FirebaseRepo", "User not logged in or ID is null when trying to access groups collection!")
-        null // Повертаємо null, якщо користувач не залогінений
+        Log.e("FirebaseRepo_User", "getUserGroupsCollection: User not logged in or ID is null!")
+        null
     }
 
-    // !!! ПРИБРАНО обчислювані властивості userId, wordsCollection, groupsCollection !!!
     fun getWordsNeedingPracticeFlow(): Flow<List<Word>> {
         val wordsCollection = getUserWordsCollection()
         if (wordsCollection == null) {
-            Log.w("FirebaseRepo", "User not logged in, cannot get practice words flow.")
+            Log.w("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] User not logged in or wordsCollection is null. Returning emptyFlow().") // ДОДАНО ЛОГ
             return emptyFlow()
         }
 
-        // Використовуємо callbackFlow для обгортання Firestore real-time listener
         return callbackFlow {
-            // Прибираємо статичний фільтр за часом з запиту Firestore
             val query = wordsCollection
-                // Фільтруємо 'mastered' на стороні Firebase, якщо є індекс, або повністю покладаємось на клієнтську фільтрацію нижче.
-                // Для надійності, давайте залишимо клієнтську фільтрацію як основну.
-                // .whereNotEqualTo("status", "mastered") // Опціонально: вимагає індексу
-                .orderBy("nextReview", Direction.ASCENDING) // Залишаємо сортування
+                .orderBy("nextReview", Direction.ASCENDING) // Сортуємо за часом наступного повторення
 
-            Log.d("FirebaseRepo", "Starting real-time listener for practice words (client-side time filter).")
+            Log.i("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] Setting up Firestore listener. Collection path: ${wordsCollection.path}") // ДОДАНО ЛОГ
 
             val listenerRegistration = query.addSnapshotListener { snapshot, exception ->
                 if (exception != null) {
-                    Log.e("FirebaseRepo", "Error listening for practice words", exception)
-                    close(exception)
+                    Log.e("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] Listener ERROR", exception) // ДОДАНО ЛОГ
+                    close(exception) // Закриваємо потік при помилці
                     return@addSnapshotListener
                 }
 
                 if (snapshot != null) {
-                    // Отримуємо поточний час *в момент отримання snapshot'а*
                     val now = System.currentTimeMillis()
+                    Log.d("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] Listener received ${snapshot.size()} documents. Current time (client): $now") // ДОДАНО ЛОГ
+
                     val words = snapshot.documents.mapNotNull { doc ->
                         try {
                             doc.toObject(Word::class.java)
                         } catch (e: Exception) {
-                            Log.e("FirebaseRepo", "Error mapping Firestore document to Word: ${doc.id}", e)
+                            Log.e("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] Error mapping document ${doc.id} to Word", e)
                             null
                         }
                     }
-                    val wordsNeedingPractice = words
-                        .filter { it.nextReview <= now } // Фільтруємо за часом *зараз*
-                        .filter { it.status != "mastered" } // Фільтруємо "mastered"
 
-                    Log.d("FirebaseRepo", "Listener received ${snapshot.size()} documents. Filtered to ${wordsNeedingPractice.size} words needing practice.")
-                    trySend(wordsNeedingPractice).isSuccess
+                    val wordsNeedingPractice = words
+                        .filter { it.nextReview <= now }      // Фільтруємо за часом
+                        .filter { it.status != "mastered" } // Фільтруємо за статусом "mastered"
+
+                    Log.i("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] Mapped ${words.size} words. Filtered to ${wordsNeedingPractice.size} words needing practice (nextReview <= $now AND status != 'mastered').") // ДОДАНО ЛОГ
+                    if (wordsNeedingPractice.isNotEmpty()) {
+                        wordsNeedingPractice.forEach { w ->
+                            Log.d("FirebaseRepo_Practice", "  - Due: ${w.text}, nextReview: ${w.nextReview}, status: ${w.status}")
+                        }
+                    }
+
+
+                    if (!trySend(wordsNeedingPractice).isSuccess) {
+                        Log.w("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] Failed to send words to collector.")
+                    }
                 } else {
-                    Log.d("FirebaseRepo", "Listener received null snapshot.")
-                    trySend(emptyList()).isSuccess
+                    Log.d("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] Listener received NULL snapshot.")
+                    // Можна відправити порожній список, якщо null snapshot не є помилкою, а просто відсутністю даних
+                    // trySend(emptyList()).isSuccess
                 }
             }
 
-            // Припиняємо слухати, коли Flow скасовується (наприклад, ViewModel очищається)
             awaitClose {
-                Log.d("FirebaseRepo", "Stopping real-time listener for practice words.")
+                Log.i("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] Stopping Firestore listener.") // ДОДАНО ЛОГ
                 listenerRegistration.remove()
             }
         }
@@ -150,10 +157,10 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
             }
     }
 
-    fun saveWord(word: Word, callback: (Boolean) -> Unit = {}) {
+    fun saveWord(word: Word, callback: (Boolean) -> Unit = {}) { // Сигнатура для узгодження
         val wordsCollection = getUserWordsCollection()
         if (wordsCollection == null || word.id.isBlank()) {
-            Log.e("FirebaseRepo", "Cannot save word. User not logged in or word ID is blank.")
+            Log.e("FirebaseRepo", "Cannot save word. User not logged in or word ID is blank. Word ID: '${word.id}'")
             callback(false)
             return
         }
@@ -161,11 +168,11 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
         val documentRef = wordsCollection.document(word.id)
         documentRef.set(word, SetOptions.merge())
             .addOnSuccessListener {
-                Log.d("FirebaseRepo", "Word ${word.id} saved successfully.")
+                Log.d("FirebaseRepo", "Word ${word.id} ('${word.text}') saved successfully.")
                 callback(true)
             }
             .addOnFailureListener { e ->
-                Log.e("FirebaseRepo", "Error saving word ${word.id}", e)
+                Log.e("FirebaseRepo", "Error saving word ${word.id} ('${word.text}')", e)
                 callback(false)
             }
     }

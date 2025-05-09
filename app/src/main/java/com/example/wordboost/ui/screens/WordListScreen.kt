@@ -57,13 +57,11 @@ fun WordListScreen(
         )
     )
 
-    // ВИКОРИСТОВУЄМО collectAsState() ДЛЯ СПОСТЕРЕЖЕННЯ ЗА StateFlow
     val displayedWords by viewModel.displayedWords.collectAsState(initial = emptyList())
     val groups by viewModel.groups.collectAsState(initial = emptyList())
     val isLoading by viewModel.isLoading.collectAsState(initial = false)
     val errorMessage by viewModel.errorMessage.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState(initial = "")
-    // ViewModel тепер очікує null для "Всі групи"
     val selectedGroupIdFilter by viewModel.selectedGroupIdFilter.collectAsState()
 
 

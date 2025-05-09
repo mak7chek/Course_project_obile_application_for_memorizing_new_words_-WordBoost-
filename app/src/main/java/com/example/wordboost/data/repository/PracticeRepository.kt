@@ -21,15 +21,14 @@ class PracticeRepository(private val firebase: FirebaseRepository) {
     fun updateWordAfterPractice(
         word: Word,
         quality: Int,
-        callback: () -> Unit
+        callback: (Boolean) -> Unit // <--- ПЕРЕКОНАЙСЯ, ЩО ТУТ (Boolean) -> Unit
     ) {
-
         val (rep, ef, interval) = PracticeUtils.sm2(
             word.repetition, word.easiness, word.interval, quality
         )
         val now = System.currentTimeMillis()
         val next = now + interval
-        val status = PracticeUtils.determineStatus(rep, interval) // Визначаємо статус
+        val status = PracticeUtils.determineStatus(rep, interval)
         val updated = word.copy(
             repetition = rep,
             easiness = ef,
@@ -38,45 +37,49 @@ class PracticeRepository(private val firebase: FirebaseRepository) {
             nextReview = next,
             status = status
         )
-        firebase.saveWord(updated) { success ->
+        // Викликаємо оновлений saveWord, який передасть Boolean
+        saveWord(updated) { success ->
             if (success) {
-                callback()
+                Log.d("PracticeRepo", "Word ${updated.id} updated successfully after practice.")
+                callback(true)
             } else {
-
-                Log.e("PracticeRepo", "Failed to save updated word ${updated.id}")
-                callback()
+                Log.e("PracticeRepo", "Failed to save updated word ${updated.id} after practice.")
+                callback(false)
             }
         }
     }
 
-    fun saveWord(word: Word, callback: () -> Unit) {
-        firebase.saveWord(word) { success ->
+    fun saveWord(word: Word, callback: (Boolean) -> Unit) { // <--- ПЕРЕКОНАЙСЯ, ЩО ТУТ (Boolean) -> Unit
+        firebase.saveWord(word) { success -> // firebase.saveWord вже повертає Boolean
             if (success) {
-                callback()
+                Log.d("PracticeRepo", "Word ${word.id} saved successfully via Firebase.")
+                callback(true)
             } else {
-                Log.e("PracticeRepo", "Failed to save word ${word.id} during undo.")
-                callback()
+                Log.e("PracticeRepo", "Error saving word ${word.id} via Firebase.")
+                callback(false)
             }
         }
     }
 
 
-    fun resetWordProgress(word: Word, callback: () -> Unit) {
+
+    fun resetWordProgress(word: Word, callback: (Boolean) -> Unit) { // <--- ПЕРЕКОНАЙСЯ, ЩО ТУТ (Boolean) -> Unit
         val reset = word.copy(
             repetition = 0,
             easiness = 2.5f,
             interval = 0L,
             lastReviewed = 0L,
-            nextReview = 0L,
+            nextReview = 0L, // Або System.currentTimeMillis(), якщо воно має бути готове до перегляду одразу
             status = "new"
         )
-
-        firebase.saveWord(reset) { success ->
+        // Викликаємо оновлений saveWord
+        saveWord(reset) { success ->
             if (success) {
-                callback()
+                Log.d("PracticeRepo", "Word ${reset.id} progress reset successfully.")
+                callback(true)
             } else {
-                Log.e("PracticeRepo", "Failed to save reset word ${reset.id}")
-                callback()
+                Log.e("PracticeRepo", "Error resetting progress for word ${reset.id}.")
+                callback(false)
             }
         }
     }

@@ -59,6 +59,10 @@ fun PracticeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScopeSnackbar = rememberCoroutineScope()
 
+    LaunchedEffect(key1 = factory) {
+        Log.d("PracticeScreen", "LaunchedEffect: Calling startOrRefreshSession.")
+        viewModel.startOrRefreshSession()
+    }
     LaunchedEffect(currentCardState) {
         Log.d("CardStateDebug", "PracticeScreen: currentCardState ViewModel змінився на $currentCardState")
     }
@@ -163,7 +167,7 @@ fun PracticeScreen(
                 ) {
                     Text("Практична сесія завершена!", style = MaterialTheme.typography.headlineMedium)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Ви обробили ${phase.totalPracticedCount} слів.")
+                    Text("Ви повторили ${phase.totalPracticedCount} слів.")
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(onClick = onBack) {
                         Text("Повернутись до головного")
