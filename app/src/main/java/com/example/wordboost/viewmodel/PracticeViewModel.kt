@@ -25,14 +25,7 @@ import kotlin.random.Random
 import com.example.wordboost.data.util.Stack
 
 
-sealed class PracticePhase {
-    object Loading : PracticePhase()
-    data class BatchPairing(val wordsInBatch: List<Word>) : PracticePhase()
-    data class BatchRegular(val wordsInBatch: List<Word>) : PracticePhase()
-    data class Finished(val totalPracticedCount: Int) : PracticePhase()
-    data class Error(val message: String) : PracticePhase()
-    object Empty : PracticePhase()
-}
+
 
 enum class PromptContentType {
     Original,
@@ -458,4 +451,13 @@ class PracticeViewModel(
         Log.d("TTS_DEBUG", "Manual Stop: Озвучення зупинено з onCleared(). TTS shutdown.")
         Log.d("PracticeVM", "ViewModel onCleared, TTS shutdown.")
     }
+}
+
+sealed class PracticePhase {
+    object Loading : PracticePhase()
+    data class BatchPairing(val wordsInBatch: List<Word>) : PracticePhase()
+    data class BatchRegular(val wordsInBatch: List<Word>) : PracticePhase()
+    data class Finished(val totalPracticedCount: Int) : PracticePhase()
+    data class Error(val message: String) : PracticePhase()
+    object Empty : PracticePhase()
 }
