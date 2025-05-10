@@ -1,255 +1,225 @@
-package com.example.wordboost.ui.components
+package com.example.wordboost.ui.components // Або твій правильний пакет
 
-import com.example.wordboost.data.model.Word
-import com.example.wordboost.viewmodel.CardState
-import com.example.wordboost.viewmodel.PromptContentType
-
+import android.util.Log
+import androidx.compose.animation.core.AnimationSpec // Потрібен для AnimationSpec
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.gestures.AnchoredDraggableState
-import androidx.compose.foundation.gestures.DraggableAnchors
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.anchoredDraggable
-import androidx.compose.foundation.gestures.snapTo
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-
+import androidx.compose.foundation.gestures.* // Імпортуємо все з gestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.runtime.remember
-import kotlin.math.roundToInt
-
-import androidx.compose.material3.*
+import androidx.compose.material3.* // Для MaterialTheme та інших M3 компонентів
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import com.example.wordboost.data.model.Word // Переконайся, що імпорт правильний
+import com.example.wordboost.viewmodel.CardState // Переконайся, що імпорт правильний
+import com.example.wordboost.viewmodel.PromptContentType // Переконайся, що імпорт правильний
 import kotlinx.coroutines.launch
-import android.util.Log
+import kotlin.math.roundToInt
 
-// !!! Імпорти для фону !!!
-import androidx.compose.foundation.background
-import androidx.compose.ui.graphics.Brush
-
-
-
+// Enum для визначення станів перетягування (якорів)
 private enum class DragAnchors {
-    Start,
-    Know,
-    DontKnow
+    Start,    // Початкова позиція
+    Know,     // Свайп вправо (слово відоме)
+    DontKnow  // Свайп вліво (слово невідоме/важке)
 }
 
-
-@OptIn(ExperimentalFoundationApi::class) // Додано OptIn для AnchoredDraggable
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun RegularPracticeUI(
     word: Word?,
     cardState: CardState,
     promptContentType: PromptContentType,
-    onFlipCard: () -> Unit, // Колбек для перевороту картки (обробляється тут)
+    onFlipCard: () -> Unit,
     onCardSwipedLeft: () -> Unit,
     onCardSwipedRight: () -> Unit,
-    onSpeakTranslationClick: (String) -> Unit, // Колбек для озвучення (передається далі)
-    modifier: Modifier = Modifier
+    onSpeakTranslationClick: (String) -> Unit,
+    modifier: Modifier = Modifier // Modifier, переданий ззовні (наприклад, для padding)
 ) {
-    // !!! Стан для жестів свайпу (перенесено з попередньої реалізації RegularPracticeUI) !!!
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val defaultActionSize = 100.dp
+    val defaultActionSize = 100.dp // Відстань, на яку треба свайпнути для спрацювання
     val actionSizePx = with(density) { defaultActionSize.toPx() }
 
+    // Ініціалізація стану для anchoredDraggable
+    // Тип <DragAnchors> вказується для AnchoredDraggableState
     val anchoredDraggableState = remember {
         AnchoredDraggableState<DragAnchors>(
             initialValue = DragAnchors.Start,
-            anchors = DraggableAnchors<DragAnchors> { DragAnchors.Start at 0f }, // Початкові якорі
-            positionalThreshold = { distance: Float -> distance * 0.5f },
-            velocityThreshold = { with(density) { 100.dp.toPx() } },
-            snapAnimationSpec = tween(),
-            decayAnimationSpec = exponentialDecay() // Використовуйте повний шлях
+            positionalThreshold = { totalDistance: Float -> totalDistance * 0.5f }, // Поріг для переходу між якорями
+            velocityThreshold = { with(density) { 100.dp.toPx() } }, // Поріг швидкості для флінгу
+            animationSpec = tween<Float>() // Анімація притягування до якоря
+            // confirmValueChange можна залишити за замовчуванням { true }
         )
     }
 
-    // Оновлюємо якорі для свайпу при зміні стану картки (свайп можливий лише у стані Answer)
-    LaunchedEffect(cardState, actionSizePx) {
+    // Динамічне оновлення якорів залежно від стану картки (Prompt або Answer)
+    LaunchedEffect(cardState, actionSizePx, anchoredDraggableState) {
         Log.d("RegularPracticeUI", "Updating anchors. CardState: $cardState, actionSizePx: $actionSizePx")
         val newAnchors = if (cardState == CardState.Answer) {
-            DraggableAnchors<DragAnchors> {
+            // Якщо картка показує відповідь, дозволяємо свайпи вліво/вправо
+            DraggableAnchors<DragAnchors> { // Явно вказуємо тип <DragAnchors>
                 DragAnchors.Start at 0f
-                DragAnchors.Know at actionSizePx // Якір для свайпу вправо (Легко)
-                DragAnchors.DontKnow at -actionSizePx // Якір для свайпу вліво (Важко)
+                DragAnchors.Know at actionSizePx       // Свайп вправо (позитивне зміщення)
+                DragAnchors.DontKnow at -actionSizePx  // Свайп вліво (негативне зміщення)
             }
         } else {
-            DraggableAnchors<DragAnchors> {
-                DragAnchors.Start at 0f // Тільки початковий якір у стані Prompt
+            // Якщо картка показує питання, дозволено тільки початковий стан (без свайпів)
+            DraggableAnchors<DragAnchors> { // Явно вказуємо тип <DragAnchors>
+                DragAnchors.Start at 0f
             }
         }
         anchoredDraggableState.updateAnchors(newAnchors)
 
-        // Миттєво повертаємо картку на початковий якір після зміни якорів (наприклад, при переході з Answer назад в Prompt)
-        if (anchoredDraggableState.currentValue != DragAnchors.Start) {
+        // Якщо після оновлення якорів поточне значення стану не "Start" і зміщення визначено,
+        // безпечно повертаємо картку в початкове положення.
+        if (anchoredDraggableState.currentValue != DragAnchors.Start && !anchoredDraggableState.offset.isNaN()) {
+            if (newAnchors.hasAnchorFor(DragAnchors.Start)) {
+                coroutineScope.launch {
+                    Log.d("RegularPracticeUI", "Snapping to Start after anchor update. Current offset: ${anchoredDraggableState.offset}")
+                    anchoredDraggableState.snapTo(DragAnchors.Start)
+                }
+            } else {
+                Log.w("RegularPracticeUI", "Cannot snap to Start after anchor update, Start anchor not in newAnchors. Offset: ${anchoredDraggableState.offset}")
+            }
+        }
+    }
+
+    // Скидання позиції картки (snapTo Start) при зміні слова
+    LaunchedEffect(word) {
+        Log.d("RegularPracticeUI", "Word changed to: ${word?.text}. Snapping to Start.")
+        // Переконуємося, що якір Start існує в поточному наборі якорів
+        if (anchoredDraggableState.anchors.hasAnchorFor(DragAnchors.Start) && !anchoredDraggableState.offset.isNaN()) {
             coroutineScope.launch {
-                Log.d("RegularPracticeUI", "Snapping draggable state to Start after anchor update.")
                 try {
                     anchoredDraggableState.snapTo(DragAnchors.Start)
-                } catch (e: IllegalStateException) {
-                    Log.e("RegularPracticeUI", "Failed to snap to Start after anchor update: ${e.message}")
+                } catch (e: Exception) {
+                    Log.e("RegularPracticeUI", "Error snapping to Start on word change: ${e.message}")
                 }
             }
+        } else if (!anchoredDraggableState.anchors.hasAnchorFor(DragAnchors.Start)) {
+            Log.w("RegularPracticeUI", "Cannot snap to Start on word change, Start anchor not defined in current anchors.")
         }
     }
 
-    // Скидаємо стан свайпу (позицію картки) при зміні слова
-    LaunchedEffect(word) {
-        Log.d("RegularPracticeUI", "Word changed: ${word?.text}. Snapping draggable state to Start.")
-        coroutineScope.launch {
-            try {
-                anchoredDraggableState.snapTo(DragAnchors.Start) // Миттєво повертаємо картку на початкову позицію
-            } catch (e: IllegalStateException) {
-                Log.e("RegularPracticeUI", "Failed to snap to Start on word change: ${e.message}")
-            }
-        }
-    }
-
-    // Автоматичне озвучення перекладу при переході в стан Answer
-    // Цей LaunchedEffect вже був у вашому коді, залишаємо його
-    LaunchedEffect(cardState) {
+    // Автоматичне озвучення перекладу, коли картка перевернута (CardState.Answer)
+    LaunchedEffect(cardState, word) { // Додав word, щоб перезапускати при зміні слова
         if (cardState == CardState.Answer && word != null) {
-            val translation = word.translation
-            if (translation != null && translation.isNotBlank()) {
-                Log.d("RegularPracticeUI", "Card state is Answer, triggering automatic TTS for word: ${word.text}, translation: $translation")
-                onSpeakTranslationClick(translation) // Викликаємо озвучення перекладу
-            } else {
-                Log.w("RegularPracticeUI", "Card state is Answer, but translation is null or blank. Not triggering TTS.")
+            word.translation?.takeIf { it.isNotBlank() }?.let { translation ->
+                Log.d("RegularPracticeUI", "Card state is Answer. Triggering TTS for word: ${word.text}, translation: $translation")
+                onSpeakTranslationClick(translation)
             }
-        } else if (cardState == CardState.Prompt) {
-            Log.d("RegularPracticeUI", "Card state is Prompt.")
         }
     }
 
-    // Обробка завершення анімації свайпу (коли картка досягла якоря Know або DontKnow)
-    // Цей LaunchedEffect вже був у вашому коді, залишаємо його
-    LaunchedEffect(anchoredDraggableState.targetValue) {
+    // Обробка завершення свайпу (коли картка "прилипла" до якоря Know або DontKnow)
+    LaunchedEffect(anchoredDraggableState.targetValue) { // Використовуємо targetValue для реакції на завершення жесту
         val target = anchoredDraggableState.targetValue
-        Log.d("RegularPracticeUI", "AnchoredDraggable targetValue changed: $target. CardState: $cardState")
+        // Перевіряємо offset, щоб уникнути дій при початковому NaN або якщо він не змінився
+        if (anchoredDraggableState.offset.isNaN()) return@LaunchedEffect
 
-        // Обробляємо свайп лише, якщо ми в стані Answer і досягли якоря Know/DontKnow
+        Log.d("RegularPracticeUI", "targetValue changed: $target. Current CardState: $cardState. Offset: ${anchoredDraggableState.offset}")
+
         if (cardState == CardState.Answer && (target == DragAnchors.Know || target == DragAnchors.DontKnow)) {
-            Log.d("RegularPracticeUI", "Swipe action detected (Know/DontKnow). Handling result.")
+            Log.d("RegularPracticeUI", "Swipe action fully settled at $target. Handling result.")
             when (target) {
-                DragAnchors.Know -> {
-                    Log.d("RegularPracticeUI", "Swipe RIGHT detected (Know). Calling onCardSwipedRight().")
-                    onCardSwipedRight() // Викликаємо колбек для свайпу вправо
-                }
-                DragAnchors.DontKnow -> {
-                    Log.d("RegularPracticeUI", "Swipe LEFT detected (DontKnow). Calling onCardSwipedLeft().")
-                    onCardSwipedLeft() // Викликаємо колбек для свайпу вліво
-                }
-                DragAnchors.Start -> {
-                    // Картка повернулася на початковий якір, нічого не робимо
-                }
+                DragAnchors.Know -> onCardSwipedRight()
+                DragAnchors.DontKnow -> onCardSwipedLeft()
+                else -> { /* Ігноруємо, якщо ціль Start або інша */ }
             }
-        } else if (target == DragAnchors.Start) {
-            Log.d("RegularPracticeUI", "AnchoredDraggable snapped back to Start.")
+            // Після того, як ViewModel обробить свайп і оновить 'word' (на null або наступне слово),
+            // LaunchedEffect(word) має скинути позицію картки (snapTo Start) для нової картки.
+            // Якщо ж ViewModel не змінює 'word' (наприклад, помилка), то картка залишиться на місці.
+            // Можна додати явний snapTo(DragAnchors.Start) сюди, якщо потрібно примусово повертати
+            // навіть якщо слово не змінилося, але це може конфліктувати з LaunchedEffect(word).
+            // Краще покладатися на зміну 'word' для скидання.
         }
     }
 
     Column(
-        modifier = modifier
-            .fillMaxSize() // Застосовуємо модифікатор ззовні (з паддінгом)
-            // !!! ДОДАЄМО ГРАДІЄНТНИЙ ФОН !!!
+        modifier = modifier // Застосовуємо зовнішній modifier (який містить paddingValues від Scaffold)
+            .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
                     colors = listOf(
-                        MaterialTheme.colorScheme.surfaceContainerHigh, // Колір зверху
-                        MaterialTheme.colorScheme.background // Колір знизу
-                        // Ви можете обрати інші кольори з вашої теми
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                        MaterialTheme.colorScheme.background
                     )
                 )
             )
-            .padding(horizontal = 16.dp, vertical = 8.dp), // Внутрішні відступи колонки
-        horizontalAlignment = Alignment.CenterHorizontally, // Центруємо вміст по горизонталі
-        verticalArrangement = Arrangement.Top // Вирівнюємо вміст колонки зверху, щоб вага працювала
+            .padding(horizontal = 16.dp, vertical = 8.dp), // Внутрішні відступи для контенту Column
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Top // Основний контент вирівнюється зверху
     ) {
         Text(
             "Звичайна Практика",
             style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(top = 8.dp, bottom = 16.dp) // Додано нижній відступ
+            modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
         )
 
-        // !!! Spacer для відцентрування картки вертикально !!!
-        Spacer(modifier = Modifier.weight(1f)) // Перший Spacer займає 1 частину доступного простору
+        Spacer(modifier = Modifier.weight(0.5f)) // Менший спейсер зверху
 
         if (word != null) {
-            // CardContainer для розміщення PracticeCard та обробки жестів
             Box(
-                // !!! Надаємо Box вагу для пропорційного розміщення на екрані !!!
                 modifier = Modifier
-                    .fillMaxWidth(0.9f) // Картка займає 90% ширини батьківського контейнера
-                    .aspectRatio(3f / 2f) // Зберігаємо співвідношення сторін картки (3:2)
-                    .weight(2f) // Box займає 2 частини доступного простору (разом зі Spacers це 1+2+1=4 частини)
+                    .fillMaxWidth(0.9f)
+                    .aspectRatio(3f / 2f) // Співвідношення сторін картки
+                    .weight(2f) // Основна вага для картки
                     .offset {
-                        // Зсуваємо картку по горизонталі відповідно до стану anchoredDraggable
-                        IntOffset(
-                            x = anchoredDraggableState
-                                .requireOffset()
-                                .roundToInt(),
-                            y = 0
-                        )
+                        // Перевіряємо, чи offset не NaN перед використанням
+                        if (anchoredDraggableState.offset.isNaN()) {
+                            IntOffset.Zero
+                        } else {
+                            // Використовуємо requireOffset(), бо якщо не NaN, він має бути валідним
+                            IntOffset(anchoredDraggableState.requireOffset().roundToInt(), 0)
+                        }
                     }
-                    // Модифікатор свайпу
-                    .anchoredDraggable(
-                        state = anchoredDraggableState, // Використовуємо AnchoredDraggableState
-                        orientation = Orientation.Horizontal, // Свайп по горизонталі
-                        enabled = cardState == CardState.Answer // Вмикаємо свайп тільки у стані Answer
+                    .anchoredDraggable( // Модифікатор для обробки свайпів
+                        state = anchoredDraggableState,
+                        orientation = Orientation.Horizontal,
+                        enabled = cardState == CardState.Answer // Свайп можливий тільки у стані відповіді
                     )
-                    // Модифікатор кліку для перегортання
-                    .clickable(enabled = cardState == CardState.Prompt) { // Клік можливий тільки в стані Prompt
-                        Log.d("RegularPracticeUI", "Card clicked to flip. CardState: $cardState. Calling onFlipCard().")
-                        onFlipCard() // Викликаємо колбек для перевороту картки
+                    .clickable(enabled = cardState == CardState.Prompt) { // Клік для перевороту
+                        Log.d("RegularPracticeUI", "Card clicked to flip. Current CardState: $cardState. Calling onFlipCard().")
+                        onFlipCard()
                     },
-                contentAlignment = Alignment.Center // Центруємо PracticeCard всередині Box
+                contentAlignment = Alignment.Center
             ) {
-                // Відображаємо саму картку PracticeCard
-                PracticeCard(
+                PracticeCard( // Твій Composable для відображення самої картки
                     word = word,
                     cardState = cardState,
                     promptContentType = promptContentType,
-                    onReplayTranslationClick = { word.translation?.let { onSpeakTranslationClick(it) } }, // Передаємо колбек для озвучення (з іконки)
-                    modifier = Modifier.fillMaxSize() // Картка заповнює контейнер Box
+                    onReplayTranslationClick = { word.translation?.takeIf { it.isNotBlank() }?.let { onSpeakTranslationClick(it) } },
+                    modifier = Modifier.fillMaxSize()
                 )
             }
 
-            // Spacer(modifier = Modifier.height(8.dp)) // Цей Spacer тепер не потрібен через verticalArrangement та вагові Spacers
-
-            // Текст підказки (клікніть або свайпніть)
-            Text(
+            Text( // Підказка для користувача
                 text = when(cardState) {
                     CardState.Prompt -> "Клікніть картку для перекладу"
-                    // Оновлено текст підказки з балами
-                    CardState.Answer -> "Свайпніть картку: Вліво - Важко (2), Вправо - Легко (5)"
+                    CardState.Answer -> "Свайпніть: Вліво - Важко (2), Вправо - Легко (5)"
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp) // Збільшено вертикальний відступ
             )
-
-            // !!! Spacer для відцентрування картки вертикально !!!
-            Spacer(modifier = Modifier.weight(1f)) // Другий Spacer займає 1 частину доступного простору
-
-
         } else {
-            // Відображаємо повідомлення, якщо слів для практики немає
+            // Якщо слів для практики немає
+            Spacer(modifier = Modifier.weight(0.5f)) // Щоб відцентрувати текст "немає слів"
             Text(
                 text = "Слів для практики поки немає.\nПеревірте список слів або спробуйте пізніше.",
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onBackground
             )
-            // Додаємо Spacer знизу, якщо немає слів, щоб повідомлення було відцентроване
-            Spacer(modifier = Modifier.weight(1f))
         }
+        Spacer(modifier = Modifier.weight(1f)) // Більший спейсер знизу
     }
 }

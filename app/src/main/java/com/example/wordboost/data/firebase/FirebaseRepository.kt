@@ -1,10 +1,7 @@
 package com.example.wordboost.data.firebase
 
 import android.util.Log
-import com.example.wordboost.data.model.Group
-import com.example.wordboost.data.model.SharedCardSet
-import com.example.wordboost.data.model.SharedSetWordItem
-import com.example.wordboost.data.model.Word
+import com.example.wordboost.data.model.*
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
@@ -19,7 +16,6 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
 import kotlin.coroutines.resume
-
 class FirebaseRepository(private val authRepository: AuthRepository) {
 
     private val db = Firebase.firestore
@@ -47,7 +43,72 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
 
     private fun getSharedSetsCollection() = db.collection("sharedCardSets")
 
+    suspend fun getMySharedSets(userId: String): Result<List<SharedCardSetSummary>> {
+        if (userId.isBlank()) return Result.failure(IllegalArgumentException("User ID cannot be blank"))
+        return try {
+            val snapshot = getSharedSetsCollection()
+                .whereEqualTo("authorId", userId)
+                .orderBy("createdAt", Query.Direction.DESCENDING) // Новіші спочатку
+                .get()
+                .await()
 
+            val summaries = snapshot.documents.mapNotNull { doc ->
+                // Мапимо документ на SharedCardSet, потім на SharedCardSetSummary
+                // Або напряму на SharedCardSetSummary, якщо поля співпадають
+                val set = doc.toObject(SharedCardSet::class.java) // Повна модель
+                set?.let {
+                    SharedCardSetSummary( // Створюємо summary з повної моделі
+                        id = it.id,
+                        name_uk = it.name_uk,
+                        authorName = it.authorName, // Або просто userId, якщо ім'я не зберігається тут
+                        wordCount = it.wordCount,
+                        difficultyLevelKey = it.difficultyLevel,
+                        isPublic = it.isPublic,
+                        createdAt = it.createdAt
+                    )
+                }
+            }
+            Log.d("FirebaseRepo", "Fetched ${summaries.size} of my shared sets for user $userId")
+            Result.success(summaries)
+        } catch (e: Exception) {
+            Log.e("FirebaseRepo", "Error fetching my shared sets for user $userId", e)
+            Result.failure(e)
+        }
+    }
+    suspend fun getPublicSharedSets(currentUserId: String): Result<List<SharedCardSetSummary>> {
+        return try {
+            val query = getSharedSetsCollection()
+                .whereEqualTo("isPublic", true)
+                // Опціонально: можна додати .whereNotEqualTo("authorId", currentUserId),
+                // але Firestore має обмеження на != у комбінації з іншими фільтрами/сортуванням.
+                // Простіше може бути відфільтрувати на клієнті, якщо потрібно.
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(50) // Обмежимо кількість для початку
+
+            val snapshot = query.get().await()
+            val summaries = snapshot.documents.mapNotNull { doc ->
+                val set = doc.toObject(SharedCardSet::class.java)
+                // Відфільтровуємо набори поточного користувача, якщо не використовували whereNotEqualTo
+                if (set?.authorId == currentUserId) return@mapNotNull null
+                set?.let {
+                    SharedCardSetSummary(
+                        id = it.id,
+                        name_uk = it.name_uk,
+                        authorName = it.authorName,
+                        wordCount = it.wordCount,
+                        difficultyLevelKey = it.difficultyLevel,
+                        isPublic = it.isPublic,
+                        createdAt = it.createdAt
+                    )
+                }
+            }
+            Log.d("FirebaseRepo", "Fetched ${summaries.size} public shared sets (excluding user's own if filtered).")
+            Result.success(summaries)
+        } catch (e: Exception) {
+            Log.e("FirebaseRepo", "Error fetching public shared sets", e)
+            Result.failure(e)
+        }
+    }
     suspend fun getTranslationSuspend(text: String): String? {
         val trimmedText = text.trim()
         if (trimmedText.isBlank()) {

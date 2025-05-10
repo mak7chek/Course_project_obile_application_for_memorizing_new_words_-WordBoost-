@@ -24,7 +24,7 @@ import com.example.wordboost.viewmodel.WordListViewModelFactory
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthenticatedMainScreen(
-    navController: NavController, // Залишаємо, якщо буде внутрішня навігація на вкладці
+    navController: NavController,
     onNavigateToTranslate: () -> Unit,
     onNavigateToPractice: () -> Unit,
     onNavigateToWordList: () -> Unit,

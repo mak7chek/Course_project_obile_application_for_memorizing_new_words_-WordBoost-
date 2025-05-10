@@ -62,57 +62,68 @@ android {
 }
 
 dependencies {
-    implementation(platform(libs.androidx.compose.bom))
+    implementation(platform("androidx.compose:compose-bom:2024.05.00"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material3:material3-window-size-class") // Для адаптивного UI
+    implementation("androidx.compose.runtime:runtime")
+    implementation("androidx.compose.runtime:runtime-livedata")
+    implementation("androidx.activity:activity-compose:1.9.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.2") // ЗАМІНИ НА АКТУАЛЬНУ ВЕРСІЮ або версію з libs
 
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.lifecycle.runtime.ktx) // KTX runtime часто йде окремо
+    // Navigation Compose
+    implementation("androidx.navigation:navigation-compose:2.7.7") // Твоя версія, перевір на актуальність
 
-    // Явно вказуємо версію Material 3, якщо вона відрізняється від версії BOM за замовчуванням
-    // Переконайтесь, що 1.3.2 сумісна з вашим BOM (1.8.0).
-    implementation("androidx.compose.material3:material3:1.3.2")
-    implementation("androidx.compose.material3:material3-window-size-class:1.3.2") // Версія Material 3 має бути однакова
+    // ViewModel Compose (для viewModel() у Composable)
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2") // ЗАМІНИ НА АКТУАЛЬНУ ВЕРСІЮ або версію з libs
 
-    // Інші Compose-пов'язані бібліотеки, які можуть мати власні версії або не входити в BOM
-    implementation("androidx.navigation:navigation-compose:2.7.7") // Залиште явну версію
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7") // Залиште явну версію
-    implementation("androidx.compose.runtime:runtime-livedata:1.8.0") // Залиште явну версію, якщо потрібна саме ця
+    // Material Icons Extended (якщо потрібні додаткові іконки)
+    implementation("androidx.compose.material:material-icons-extended") // Версія з BOM
 
+    // WorkManager
+    implementation("androidx.work:work-runtime-ktx:2.9.0") // ЗАМІНИ НА АКТУАЛЬНУ ВЕРСІЮ або версію з libs
 
-    // Інші залежності вашого проєкту
-    implementation("androidx.work:work-runtime-ktx:2.10.1")
-    implementation("androidx.room:room-runtime:2.6.1")
-    kapt("androidx.room:room-compiler:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
+    // Room (локальна база даних)
+    implementation("androidx.room:room-runtime:2.6.1") // Твоя версія, перевір на актуальність
+    kapt("androidx.room:room-compiler:2.6.1")      // KAPT для Room
+    implementation("androidx.room:room-ktx:2.6.1")       // Kotlin extensions для Room
 
-    implementation(platform("com.google.firebase:firebase-bom:33.12.0"))
+    implementation(platform("com.google.firebase:firebase-bom:33.1.0")) // Приклад актуальної версії, можеш залишити свою 33.12.0, якщо вона стабільна
+
+    // Бібліотеки Firebase (версії будуть взяті з Firebase BOM)
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-auth-ktx")
-    implementation("com.google.firebase:firebase-analytics")
-    // libs.firebase.common.ktx, ймовірно, надається BOM або іншими залежностями Firebase
+    implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("com.squareup.retrofit2:retrofit:2.11.0") // ЗАМІНИ НА АКТУАЛЬНУ СТАБІЛЬНУ ВЕРСІЮ
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0") // Версія має співпадати з retrofit
 
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    implementation("com.google.code.gson:gson:2.10.1")
+    // Gson
+    implementation("com.google.code.gson:gson:2.10.1") // Твоя версія, виглядає нормально
 
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    // Kotlin Coroutines
+    // Версія 1.9.0 дуже нова (навіть для уявного травня 2025 може бути bleeding edge).
+    // Використовуй останню стабільну. Наприклад, 1.8.0 або новішу, якщо вона є.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1") // ЗАМІНИ НА АКТУАЛЬНУ СТАБІЛЬНУ ВЕРСІЮ
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1") // Та сама версія
 
+    // Тестові залежності (використовуй libs, якщо вони там визначені)
+    testImplementation(libs.junit) // Припускаю, що libs.junit визначено
+    androidTestImplementation(libs.androidx.junit) // Припускаю, що libs.androidx.junit визначено
+    androidTestImplementation(libs.androidx.espresso.core) // Припускаю, що libs.androidx.espresso.core визначено
+    androidTestImplementation(platform("androidx.compose:compose-bom:2024.05.00")) // Також використовуй BOM для тестів Compose
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4") // Версія з BOM
 
-    // Тестові залежності
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom)) // Використовуйте BOM і для тестів
-    androidTestImplementation(libs.androidx.ui.test.junit4)
-
-    // Debug залежності
-    debugImplementation(libs.androidx.ui.tooling)
+    // Debug залежності (використовуй libs)
+    debugImplementation(libs.androidx.ui.tooling) // Для Layout Inspector і т.д.
     debugImplementation(libs.androidx.ui.test.manifest)
 
-    implementation(libs.androidx.media3.common.ktx)
-    implementation(libs.androidx.room.common.jvm) // Залиште
+    // Media3 (якщо ти його використовуєш для чогось, наприклад, аудіо)
+     implementation(libs.androidx.media3.common.ktx) // У тебе було, залиш, якщо потрібно
+
+    // Не зовсім зрозуміло, для чого ця залежність, якщо є room-runtime та room-ktx.
+    // Можливо, вона транзитивна або специфічна для якогось випадку.
+    implementation(libs.androidx.room.common.jvm)
 }
 apply(plugin = "com.google.gms.google-services")
