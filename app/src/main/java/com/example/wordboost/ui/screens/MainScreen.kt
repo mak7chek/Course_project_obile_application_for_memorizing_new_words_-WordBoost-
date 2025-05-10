@@ -1,33 +1,41 @@
 package com.example.wordboost.ui.screens
 
 import android.util.Log
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.example.wordboost.data.firebase.AuthRepository // Переконайтесь в імпорті
-import com.example.wordboost.data.firebase.FirebaseRepository // Переконайтесь в імпорті
-import com.example.wordboost.data.repository.PracticeRepository // Переконайтесь в імпорті
-import com.example.wordboost.data.repository.TranslationRepository // Переконайтесь в імпорті
-import com.example.wordboost.data.tts.TextToSpeechService // Переконайтесь в імпорті
-import com.example.wordboost.viewmodel.EditWordViewModelFactory
-import com.example.wordboost.viewmodel.WordListViewModelFactory
-import com.example.wordboost.viewmodel.PracticeViewModelFactory
-import com.example.wordboost.ui.screens.PracticeScreen
+import androidx.lifecycle.viewmodel.compose.viewModel // Важливо для viewModel()
+import com.example.wordboost.data.firebase.AuthRepository
+import com.example.wordboost.data.firebase.FirebaseRepository
+import com.example.wordboost.data.repository.PracticeRepository
+import com.example.wordboost.data.repository.TranslationRepository
+import com.example.wordboost.data.tts.TextToSpeechService
+import com.example.wordboost.viewmodel.* // Твої factories
+// import com.example.wordboost.viewmodel.CreateSetViewModel // Тепер це ui.viewmodels.CreateSetViewModel
+import com.example.wordboost.viewmodel.CreateSetViewModel // Правильний імпорт
 
-enum class AppState {
+// Оновлений AppState для керування верхньорівневими екранами
+enum class TopLevelScreenState {
     Loading,
-    UnauthenticatedChoice,
-    Login,
-    Register,
-    AuthenticatedMain,
-    AuthenticatedTranslate,
-    AuthenticatedPractice,
-    AuthenticatedWordList,
-    AuthenticatedEditWord
+    AuthFlow,
+    AuthenticatedApp, // Показує AuthenticatedAppScaffold (з BottomNav)
+    TranslateWordFullScreen,
+    PracticeSessionFullScreen,
+    WordListFullScreen,
+    EditWordFullScreen,
+    CreateSetWizardFullScreen
 }
 
+// Допоміжний enum для внутрішньої навігації в AuthFlow
+enum class AuthSubState {
+    AuthChoice, Login, Register
+}
 
 @Composable
 fun MainScreen(
@@ -37,162 +45,130 @@ fun MainScreen(
     translationRepo: TranslationRepository,
     ttsService: TextToSpeechService
 ) {
-    var currentAppState by remember { mutableStateOf<AppState>(AppState.Loading) }
-    var editingWordId by remember { mutableStateOf<String?>(null) }
+    var currentTopLevelScreenState by remember { mutableStateOf(TopLevelScreenState.Loading) }
+    var currentAuthSubState by remember { mutableStateOf(AuthSubState.AuthChoice) }
+    var editingWordIdForFullScreen by remember { mutableStateOf<String?>(null) }
 
-
-    // --- Створюємо Factory для ViewModel Практики ---
-    // Factory потребує PracticeRepository, TtsService та AuthRepository
     val practiceViewModelFactory = remember(practiceRepo, ttsService, authRepo) {
-        // Передаємо practiceRepo як repository до PracticeViewModelFactory
         PracticeViewModelFactory(repository = practiceRepo, ttsService = ttsService, authRepository = authRepo)
     }
-
-    // --- Створюємо Factory для ViewModel Списку Слів (якщо вона тут потрібна) ---
     val wordListViewModelFactory = remember(firebaseRepo, authRepo, ttsService) {
-        // Передаємо firebaseRepo як repository до WordListViewModelFactory
         WordListViewModelFactory(repository = firebaseRepo, authRepository = authRepo, ttsService = ttsService)
     }
+    val editWordViewModelFactoryBuilder = remember(firebaseRepo) {
+        { wordId: String? -> EditWordViewModelFactory(repository = firebaseRepo, wordId = wordId) }
+    }
+    // translateViewModelFactory не потрібен тут, якщо TranslateScreen викликається напряму з усіма залежностями
+    val createSetViewModelFactory = remember(firebaseRepo, translationRepo, authRepo) {
+        CreateSetViewModelFactory(firebaseRepository = firebaseRepo, translationRepository = translationRepo, authRepository = authRepo)
+    }
 
-
-    LaunchedEffect(authRepo) { // Запускається при зміні authRepo (або один раз при старті)
-        Log.d("MainScreen", "Collecting auth state...")
+    LaunchedEffect(authRepo) {
         authRepo.getAuthState().collect { user ->
-            Log.d("MainScreen", "Auth state changed in collect: User ID = ${user?.uid}")
-            currentAppState = if (user != null && user.isEmailVerified) {
+            val previousState = currentTopLevelScreenState // Зберігаємо попередній стан
+            if (user != null && user.isEmailVerified) {
                 Log.d("MainScreen", "User authenticated and verified.")
-                AppState.AuthenticatedMain
+                // Переходимо до AuthenticatedApp тільки якщо ми були в Loading або AuthFlow
+                if (previousState == TopLevelScreenState.Loading || previousState == TopLevelScreenState.AuthFlow) {
+                    currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp
+                }
+                // Якщо користувач вже був у якомусь автентифікованому стані, не змінюємо його тут,
+                // щоб не перервати, наприклад, сесію практики при оновленні токена.
             } else if (user != null && !user.isEmailVerified) {
                 Log.d("MainScreen", "User authenticated but NOT verified.")
-                AppState.UnauthenticatedChoice // Або повертаємо на вибір автентифікації
-            }
-            else {
+                currentTopLevelScreenState = TopLevelScreenState.AuthFlow
+                currentAuthSubState = AuthSubState.Login
+            } else { // user is null
                 Log.d("MainScreen", "User is null (logged out).")
-                AppState.UnauthenticatedChoice // Якщо користувач null, переходимо на екран вибору автентифікації
+                currentTopLevelScreenState = TopLevelScreenState.AuthFlow
+                currentAuthSubState = AuthSubState.AuthChoice
             }
-            Log.d("MainScreen", "AppState updated to: $currentAppState")
+            Log.d("MainScreen", "TopLevelScreenState updated to: $currentTopLevelScreenState, AuthSubState: $currentAuthSubState")
         }
     }
 
-
-
-    when (currentAppState) {
-        AppState.Loading -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        when (currentTopLevelScreenState) {
+            TopLevelScreenState.Loading -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
             }
-        }
-        AppState.UnauthenticatedChoice -> {
-            AuthChoiceScreen(
-                onLoginClick = {
-                    Log.d("MainScreen", "Navigating to Login")
-                    currentAppState = AppState.Login
-                },
-                onRegisterClick = {
-                    Log.d("MainScreen", "Navigating to Register")
-                    currentAppState = AppState.Register
+            TopLevelScreenState.AuthFlow -> {
+                when (currentAuthSubState) {
+                    AuthSubState.AuthChoice -> AuthChoiceScreen(
+                        onLoginClick = { currentAuthSubState = AuthSubState.Login },
+                        onRegisterClick = { currentAuthSubState = AuthSubState.Register }
+                    )
+                    AuthSubState.Login -> LoginScreen(
+                        authRepo = authRepo,
+                        onSuccess = { /* Стан зміниться через LaunchedEffect */ },
+                        onBack = { currentAuthSubState = AuthSubState.AuthChoice },
+                        onNavigateToRegister = { currentAuthSubState = AuthSubState.Register } // <--- Тепер LoginScreen має цей параметр
+                    )
+                    AuthSubState.Register -> RegisterScreen(
+                        authRepo = authRepo,
+                        onRegistrationSuccess = { currentAuthSubState = AuthSubState.Login },
+                        onBack = { currentAuthSubState = AuthSubState.AuthChoice }
+                    )
                 }
-            )
-        }
-        AppState.Login -> {
-            LoginScreen(
-                authRepo = authRepo,
-                onSuccess = {
-                    Log.d("MainScreen", "Login Success, Navigating to AuthenticatedMain")
-                    currentAppState = AppState.AuthenticatedMain
-                },
-                onBack = {
-                    Log.d("MainScreen", "Login Back, Navigating to UnauthenticatedChoice")
-                    currentAppState = AppState.UnauthenticatedChoice
-                }
-            )
-        }
-        AppState.Register -> {
-            RegisterScreen(
-                authRepo = authRepo,
-                onRegistrationSuccess = {
-                    Log.d("MainScreen", "Registration Success, Navigating to Login")
-                    currentAppState = AppState.Login
-                },
-                onBack = {
-                    Log.d("MainScreen", "Register Back, Navigating to UnauthenticatedChoice")
-                    currentAppState = AppState.UnauthenticatedChoice
-                }
-            )
-        }
-        AppState.AuthenticatedMain -> {
-            AuthenticatedMainScreen(
-                onTranslateClick = {
-                    Log.d("MainScreen", "Navigating to Translate")
-                    currentAppState = AppState.AuthenticatedTranslate
-                },
-                onPracticeClick = {
-                    Log.d("MainScreen", "Navigating to Practice")
-                    currentAppState = AppState.AuthenticatedPractice
-                },
-                onWordListClick = {
-                    Log.d("MainScreen", "Navigating to WordList")
-                    currentAppState = AppState.AuthenticatedWordList
-                },
-                onLogoutClick = {
-                    Log.d("MainScreen", "Logging out")
-                    authRepo.logout()
-                },
-                wordListViewModelFactory = wordListViewModelFactory
-            )
-        }
-        AppState.AuthenticatedTranslate -> {
-            TranslateScreen(
-                firebaseRepo = firebaseRepo,
-                translationRepo = translationRepo,
-                onBack = {
-                    Log.d("MainScreen", "Translate Back, Navigating to AuthenticatedMain")
-                    currentAppState = AppState.AuthenticatedMain
-                }
-            )
-        }
-        AppState.AuthenticatedPractice -> {
-            PracticeScreen(
-                factory = practiceViewModelFactory, // <<< Передаємо Factory
-                onBack = { // Колбек повернення з PracticeScreen
-                    Log.d("MainScreen", "Practice Back, Navigating to AuthenticatedMain")
-                    currentAppState = AppState.AuthenticatedMain // Повертаємось до головного
-                }
-            )
-        }
-
-
-        AppState.AuthenticatedWordList -> {
-            WordListScreen(
-                repository = firebaseRepo,
-                ttsService = ttsService,
-                authRepository = authRepo,
-                onWordEdit = { wordId ->
-                    Log.d("MainScreen", "Handling onWordEdit. Navigating to AuthenticatedEditWord for word ID: $wordId")
-                    editingWordId = wordId
-                    currentAppState = AppState.AuthenticatedEditWord
-                },
-                onBack = {
-                    Log.d("MainScreen", "WordList Back, Navigating to AuthenticatedMain")
-                    currentAppState = AppState.AuthenticatedMain
-                }
-            )
-        }
-        AppState.AuthenticatedEditWord -> {
-            if (editingWordId != null) {
+            }
+            TopLevelScreenState.AuthenticatedApp -> {
+                AuthenticatedAppScaffold(
+                    // Передаємо колбеки, які змінюють currentTopLevelScreenState
+                    onNavigateToTranslate = { currentTopLevelScreenState = TopLevelScreenState.TranslateWordFullScreen },
+                    onNavigateToPractice = { currentTopLevelScreenState = TopLevelScreenState.PracticeSessionFullScreen },
+                    onNavigateToWordList = { currentTopLevelScreenState = TopLevelScreenState.WordListFullScreen },
+                    onNavigateToCreateSet = { currentTopLevelScreenState = TopLevelScreenState.CreateSetWizardFullScreen },
+                    onLogoutClick = { authRepo.logout() /* Стан зміниться через LaunchedEffect */ },
+                    // Передаємо тільки ті factories, які потрібні екранам всередині AuthenticatedAppScaffold
+                    wordListViewModelFactory = wordListViewModelFactory
+                )
+            }
+            TopLevelScreenState.TranslateWordFullScreen -> {
+                TranslateScreen(
+                    firebaseRepo = firebaseRepo,
+                    translationRepo = translationRepo,
+                    onBack = { currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp }
+                )
+            }
+            TopLevelScreenState.PracticeSessionFullScreen -> {
+                PracticeScreen(
+                    factory = practiceViewModelFactory,
+                    onBack = { currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp }
+                )
+            }
+            TopLevelScreenState.WordListFullScreen -> {
+                WordListScreen(
+                    repository = firebaseRepo,
+                    ttsService = ttsService,
+                    authRepository = authRepo,
+                    onWordEdit = { wordId ->
+                        editingWordIdForFullScreen = wordId
+                        currentTopLevelScreenState = TopLevelScreenState.EditWordFullScreen
+                    },
+                    onBack = { currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp }
+                )
+            }
+            TopLevelScreenState.EditWordFullScreen -> {
                 EditWordScreen(
-                    wordId = editingWordId,
-                    factory = EditWordViewModelFactory(repository = firebaseRepo, wordId = editingWordId),
+                    wordId = editingWordIdForFullScreen,
+                    factory = editWordViewModelFactoryBuilder(editingWordIdForFullScreen),
                     onBack = {
-                        Log.d("MainScreen", "Handling onBack from EditWordScreen. Navigating back to AuthenticatedWordList.")
-                        editingWordId = null
-                        currentAppState = AppState.AuthenticatedWordList
+                        editingWordIdForFullScreen = null
+                        currentTopLevelScreenState = TopLevelScreenState.WordListFullScreen
                     }
                 )
-            } else {
-
-                Log.e("MainScreen", "Attempted to navigate to EditWord with null editingWordId. Redirecting to WordList.")
-                currentAppState = AppState.AuthenticatedWordList
+            }
+            TopLevelScreenState.CreateSetWizardFullScreen -> {
+                val createSetViewModel: CreateSetViewModel = viewModel(factory = createSetViewModelFactory)
+                CreateSetScreen( // Цей екран керує своїми внутрішніми кроками
+                    viewModel = createSetViewModel,
+                    onCloseOrNavigateBack = {
+                        createSetViewModel.resetAllState()
+                        currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp
+                    }
+                )
             }
         }
     }

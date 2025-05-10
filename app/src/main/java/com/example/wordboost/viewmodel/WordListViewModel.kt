@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.wordboost.data.firebase.*
 import com.example.wordboost.data.model.Group
 import com.example.wordboost.data.model.Word
-import com.example.wordboost.data.model.PracticeUtils
+import com.example.wordboost.data.util.PracticeUtils
 
 import com.example.wordboost.data.tts.TextToSpeechService
 import com.google.firebase.firestore.ListenerRegistration

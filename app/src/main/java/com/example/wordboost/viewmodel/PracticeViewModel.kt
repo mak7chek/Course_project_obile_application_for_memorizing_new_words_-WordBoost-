@@ -4,14 +4,13 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wordboost.data.firebase.AuthRepository
-import com.example.wordboost.data.model.PracticeUtils
+import com.example.wordboost.data.util.PracticeUtils
 import com.example.wordboost.data.model.Word
 import com.example.wordboost.data.repository.PracticeRepository
 import com.example.wordboost.data.tts.TextToSpeechService
 import com.example.wordboost.data.util.Stack
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlin.math.min
 import kotlin.random.Random
 
 
@@ -239,16 +238,12 @@ class PracticeViewModel(
         Log.d("PracticeVM_Process", "Updated word local stats: nextReview=${updatedWord.nextReview}, status='${updatedWord.status}'")
 
         viewModelScope.launch {
-            // !!! ПЕРЕКОНАЙСЯ, ЩО ТУТ ВИКОРИСТОВУЄТЬСЯ ПРАВИЛЬНА СИГНАТУРА КОЛБЕКА !!!
-            // Якщо PracticeRepository.saveWord має callback: (Boolean) -> Unit:
             practiceRepository.saveWord(updatedWord) { success ->
                 Log.i("PracticeVM_Process", "saveWord CALLBACK for '${updatedWord.text}'. Success: $success")
                 if (!success) {
                     Log.e("PracticeVM_Process", "Failed to save word ${updatedWord.text} in Firebase.")
                     _errorMessage.value = "Помилка збереження прогресу слова."
                 }
-                // Продовжуємо, навіть якщо збереження не вдалося, щоб не блокувати користувача
-                // але помилку показали.
                 totalPracticedCount++
                 Log.d("PracticeVM_Process", "totalPracticedCount is now $totalPracticedCount")
 

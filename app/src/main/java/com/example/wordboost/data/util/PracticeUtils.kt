@@ -1,4 +1,4 @@
-package com.example.wordboost.data.model
+package com.example.wordboost.data.util
 
 import kotlin.math.max
 import java.util.concurrent.TimeUnit

@@ -19,7 +19,8 @@ import com.example.wordboost.viewmodel.LoginEvent
 fun LoginScreen(
     authRepo: AuthRepository,
     onSuccess: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToRegister: () -> Unit // <--- ДОДАЙ ЦЕЙ ПАРАМЕТР
 ) {
     val viewModel: LoginViewModel = viewModel(factory = AuthViewModelFactory(authRepo))
 

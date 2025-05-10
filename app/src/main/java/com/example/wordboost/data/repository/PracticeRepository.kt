@@ -3,7 +3,7 @@ package com.example.wordboost.data.repository
 import android.util.Log
 import com.example.wordboost.data.firebase.FirebaseRepository
 import com.example.wordboost.data.model.Word
-import com.example.wordboost.data.model.PracticeUtils
+import com.example.wordboost.data.util.PracticeUtils
 // !!! Import Flow !!!
 import kotlinx.coroutines.flow.Flow
 
@@ -37,7 +37,6 @@ class PracticeRepository(private val firebase: FirebaseRepository) {
             nextReview = next,
             status = status
         )
-        // Викликаємо оновлений saveWord, який передасть Boolean
         saveWord(updated) { success ->
             if (success) {
                 Log.d("PracticeRepo", "Word ${updated.id} updated successfully after practice.")

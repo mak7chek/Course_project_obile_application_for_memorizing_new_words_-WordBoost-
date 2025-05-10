@@ -1,30 +1,39 @@
 package com.example.wordboost.data.firebase
 
-import com.example.wordboost.data.model.Word // Переконайтесь, що імпортовано
-import com.example.wordboost.data.model.Group // Переконайтесь, що імпортовано
-import com.google.firebase.firestore.SetOptions
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
-import com.google.firebase.firestore.FirebaseFirestore // Явний імпорт для getInstance()
-import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.firestore.WriteBatch
-import kotlinx.coroutines.tasks.await
 import android.util.Log
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.callbackFlow
+import com.example.wordboost.data.model.Group
+import com.example.wordboost.data.model.SharedCardSet
+import com.example.wordboost.data.model.SharedSetWordItem
+import com.example.wordboost.data.model.Word
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Query.Direction
+import com.google.firebase.firestore.SetOptions
+import com.google.firebase.ktx.Firebase
+import com.google.firebase.firestore.ktx.firestore
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.tasks.await
+import kotlin.coroutines.resume
 
 class FirebaseRepository(private val authRepository: AuthRepository) {
 
     private val db = Firebase.firestore
+
+    private fun getUserWordsCollectionPath(): String? {
+        val userId = authRepository.getCurrentUser()?.uid
+        return if (userId != null) "users/$userId/words" else null
+    }
+
     private fun getUserWordsCollection() = authRepository.getCurrentUser()?.uid?.let { userId ->
-        Log.i("FirebaseRepo_User", "getUserWordsCollection: Accessing words for userId: $userId") // ДОДАНО ЛОГ
+        Log.i("FirebaseRepo_User", "getUserWordsCollection: Accessing words for userId: $userId")
         db.collection("users").document(userId).collection("words")
     } ?: run {
-        Log.e("FirebaseRepo_User", "getUserWordsCollection: User not logged in or ID is null!") // ДОДАНО ЛОГ
+        Log.e("FirebaseRepo_User", "getUserWordsCollection: User not logged in or ID is null!")
         null
     }
 
@@ -36,341 +45,205 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
         null
     }
 
-    fun getWordsNeedingPracticeFlow(): Flow<List<Word>> {
-        val wordsCollection = getUserWordsCollection()
-        if (wordsCollection == null) {
-            Log.w("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] User not logged in or wordsCollection is null. Returning emptyFlow().") // ДОДАНО ЛОГ
-            return emptyFlow()
+    private fun getSharedSetsCollection() = db.collection("sharedCardSets")
+
+
+    suspend fun getTranslationSuspend(text: String): String? {
+        val trimmedText = text.trim()
+        if (trimmedText.isBlank()) {
+            Log.d("FirebaseRepo", "[getTranslationSuspend] Input text is blank, returning null.")
+            return null
         }
 
-        return callbackFlow {
-            val query = wordsCollection
-                .orderBy("nextReview", Direction.ASCENDING) // Сортуємо за часом наступного повторення
+        val wordsCollection = getUserWordsCollection()
+        if (wordsCollection == null) {
+            Log.w("FirebaseRepo", "[getTranslationSuspend] User words collection is null, cannot get translation.")
+            return null
+        }
+        Log.d("FirebaseRepo", "[getTranslationSuspend] Searching for '$trimmedText' in ${wordsCollection.path}")
 
-            Log.i("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] Setting up Firestore listener. Collection path: ${wordsCollection.path}") // ДОДАНО ЛОГ
+        try {
+            // 1. Перевіряємо, чи 'trimmedText' є в полі 'text' (оригінальне слово)
+            var querySnapshot = wordsCollection
+                .whereEqualTo("text", trimmedText)
+                .limit(1)
+                .get()
+                .await() // Використовуємо await() для suspend-взаємодії
 
-            val listenerRegistration = query.addSnapshotListener { snapshot, exception ->
-                if (exception != null) {
-                    Log.e("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] Listener ERROR", exception) // ДОДАНО ЛОГ
-                    close(exception) // Закриваємо потік при помилці
-                    return@addSnapshotListener
-                }
-
-                if (snapshot != null) {
-                    val now = System.currentTimeMillis()
-                    Log.d("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] Listener received ${snapshot.size()} documents. Current time (client): $now") // ДОДАНО ЛОГ
-
-                    val words = snapshot.documents.mapNotNull { doc ->
-                        try {
-                            doc.toObject(Word::class.java)
-                        } catch (e: Exception) {
-                            Log.e("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] Error mapping document ${doc.id} to Word", e)
-                            null
-                        }
-                    }
-
-                    val wordsNeedingPractice = words
-                        .filter { it.nextReview <= now }      // Фільтруємо за часом
-                        .filter { it.status != "mastered" } // Фільтруємо за статусом "mastered"
-
-                    Log.i("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] Mapped ${words.size} words. Filtered to ${wordsNeedingPractice.size} words needing practice (nextReview <= $now AND status != 'mastered').") // ДОДАНО ЛОГ
-                    if (wordsNeedingPractice.isNotEmpty()) {
-                        wordsNeedingPractice.forEach { w ->
-                            Log.d("FirebaseRepo_Practice", "  - Due: ${w.text}, nextReview: ${w.nextReview}, status: ${w.status}")
-                        }
-                    }
-
-
-                    if (!trySend(wordsNeedingPractice).isSuccess) {
-                        Log.w("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] Failed to send words to collector.")
-                    }
-                } else {
-                    Log.d("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] Listener received NULL snapshot.")
-                    // Можна відправити порожній список, якщо null snapshot не є помилкою, а просто відсутністю даних
-                    // trySend(emptyList()).isSuccess
-                }
+            if (!querySnapshot.isEmpty) {
+                val word = querySnapshot.documents.firstOrNull()?.toObject(Word::class.java)
+                val translation = word?.translation?.trim()
+                Log.d("FirebaseRepo", "[getTranslationSuspend] Found as 'text': '$trimmedText' -> '$translation'.")
+                return translation
             }
 
-            awaitClose {
-                Log.i("FirebaseRepo_Practice", "[getWordsNeedingPracticeFlow] Stopping Firestore listener.") // ДОДАНО ЛОГ
-                listenerRegistration.remove()
+            // 2. Якщо не знайдено, перевіряємо, чи 'trimmedText' є в полі 'translation'
+            querySnapshot = wordsCollection
+                .whereEqualTo("translation", trimmedText)
+                .limit(1)
+                .get()
+                .await()
+
+            if (!querySnapshot.isEmpty) {
+                val word = querySnapshot.documents.firstOrNull()?.toObject(Word::class.java)
+                val originalText = word?.text?.trim()
+                Log.d("FirebaseRepo", "[getTranslationSuspend] Found as 'translation': '$originalText' -> '$trimmedText'. Returning original: '$originalText'")
+                return originalText // Повертаємо оригінальне слово
             }
+
+            Log.d("FirebaseRepo", "[getTranslationSuspend] Word '$trimmedText' not found in user's Firebase dictionary as original or translation.")
+            return null // Не знайдено в жодному з полів
+        } catch (e: Exception) {
+            Log.e("FirebaseRepo", "[getTranslationSuspend] Error getting translation for '$trimmedText' from Firestore", e)
+            return null // Помилка під час запиту
         }
     }
 
-
-
-
-    fun getWordObject(text: String, callback: (Word?) -> Unit) {
-        val wordsCollection = getUserWordsCollection()
-        if (wordsCollection == null) {
-            callback(null)
-            return
-        }
-        wordsCollection
-            .whereEqualTo("text", text)
-            .limit(1)
-            .get()
-            .addOnSuccessListener { docs ->
-                val word = docs.firstOrNull()?.toObject(Word::class.java)
-                callback(word)
-            }
-            .addOnFailureListener { e ->
-                Log.e("FirebaseRepo", "Error getting word object by text", e)
-                callback(null)
-            }
-    }
-
+    @Deprecated("Use getTranslationSuspend instead for better coroutine integration.", ReplaceWith("getTranslationSuspend(text)"))
     fun getTranslation(text: String, callback: (String?) -> Unit) {
-        val wordsCollection = getUserWordsCollection() // Отримуємо колекцію
-        if (wordsCollection == null) { // Перевірка
+        val wordsCollection = getUserWordsCollection()
+        if (wordsCollection == null) {
             callback(null)
             return
         }
+        val trimmedText = text.trim()
 
         wordsCollection
-            .whereEqualTo("text", text)
+            .whereEqualTo("text", trimmedText)
             .limit(1)
             .get()
             .addOnSuccessListener { docs ->
                 if (!docs.isEmpty) {
                     val word = docs.firstOrNull()?.toObject(Word::class.java)
-                    callback(word?.translation)
+                    callback(word?.translation?.trim())
                 } else {
                     wordsCollection
-                        .whereEqualTo("translation", text)
+                        .whereEqualTo("translation", trimmedText)
                         .limit(1)
                         .get()
                         .addOnSuccessListener { altDocs ->
                             val word = altDocs.firstOrNull()?.toObject(Word::class.java)
-                            callback(word?.text) // Знайшли в translation, повертаємо text
+                            callback(word?.text?.trim())
                         }
                         .addOnFailureListener { e ->
-                            Log.e("FirebaseRepo", "Error getting translation (alt query)", e)
+                            Log.e("FirebaseRepo", "[getTranslation_OLD] Error (alt query for '$trimmedText')", e)
                             callback(null)
                         }
                 }
             }
             .addOnFailureListener { e ->
-                Log.e("FirebaseRepo", "Error getting translation (main query)", e)
+                Log.e("FirebaseRepo", "[getTranslation_OLD] Error (main query for '$trimmedText')", e)
                 callback(null)
             }
     }
 
-    fun saveWord(word: Word, callback: (Boolean) -> Unit = {}) { // Сигнатура для узгодження
-        val wordsCollection = getUserWordsCollection()
-        if (wordsCollection == null || word.id.isBlank()) {
-            Log.e("FirebaseRepo", "Cannot save word. User not logged in or word ID is blank. Word ID: '${word.id}'")
-            callback(false)
-            return
+    suspend fun createSharedCardSetInFirestore(
+        sharedSet: SharedCardSet,
+        wordsToAdd: List<SharedSetWordItem>
+    ): Result<String> {
+        val currentUserUid = authRepository.getCurrentUser()?.uid
+        if (currentUserUid == null || currentUserUid != sharedSet.authorId) {
+            Log.e("FirebaseRepo", "User not logged in or authorId mismatch for creating shared set.")
+            return Result.failure(IllegalStateException("User not authorized or authorId mismatch."))
         }
 
-        val documentRef = wordsCollection.document(word.id)
-        documentRef.set(word, SetOptions.merge())
-            .addOnSuccessListener {
-                Log.d("FirebaseRepo", "Word ${word.id} ('${word.text}') saved successfully.")
-                callback(true)
-            }
-            .addOnFailureListener { e ->
-                Log.e("FirebaseRepo", "Error saving word ${word.id} ('${word.text}')", e)
-                callback(false)
-            }
-    }
+        val newSetDocumentRef = getSharedSetsCollection().document()
+        val finalSetData = sharedSet.copy(
+            id = newSetDocumentRef.id,
+            wordCount = wordsToAdd.size
+        )
 
-    fun deleteWord(wordId: String, callback: (Boolean) -> Unit) {
-        val wordsCollection = getUserWordsCollection()
-        if (wordsCollection == null || wordId.isBlank()) {
-            Log.e("FirebaseRepo", "Cannot delete word. User not logged in or word ID is blank.")
-            callback(false)
-            return
-        }
-        wordsCollection.document(wordId)
-            .delete()
-            .addOnSuccessListener {
-                Log.d("FirebaseRepo", "Word $wordId deleted successfully.")
-                callback(true)
-            }
-            .addOnFailureListener { e ->
-                Log.e("FirebaseRepo", "Error deleting word $wordId", e)
-                callback(false)
-            }
-    }
-    fun getWordById(wordId: String, callback: (Word?) -> Unit) {
-        getUserWordsCollection()?.document(wordId)?.get()
-            ?.addOnSuccessListener { document ->
-                val word = document.toObject(Word::class.java)
-                callback(word)
-            }
-            ?.addOnFailureListener { e ->
-                Log.e("FirebaseRepo", "Error getting word by ID: $wordId", e)
-                callback(null)
-            }
-            ?: callback(null) // Якщо колекція не доступна
-    }
-
-    suspend fun getWordById_Suspend(wordId: String): Word? {
-        val wordsCollection = getUserWordsCollection() ?: return null
         return try {
-            val snapshot = wordsCollection.document(wordId).get().await()
-            snapshot.toObject(Word::class.java)
+            db.runBatch { batch ->
+                batch.set(newSetDocumentRef, finalSetData)
+                val wordsSubCollectionRef = newSetDocumentRef.collection("words")
+                wordsToAdd.forEach { wordItem ->
+                    val newWordDocRef = wordsSubCollectionRef.document()
+                    batch.set(newWordDocRef, wordItem)
+                }
+            }.await()
+            Log.d("FirebaseRepo", "SharedCardSet '${finalSetData.name_uk}' (ID: ${finalSetData.id}) created with ${wordsToAdd.size} words.")
+            Result.success(finalSetData.id)
         } catch (e: Exception) {
-            Log.e("FirebaseRepo", "Error getting word by ID: $wordId", e)
-            null
+            Log.e("FirebaseRepo", "Error creating SharedCardSet '${finalSetData.name_uk}' in Firestore", e)
+            Result.failure(e)
         }
     }
-    fun getWordsListener(callback: (List<Word>) -> Unit): ListenerRegistration? {
+
+
+    // --- Методи для слів користувача (Practice, WordList, etc.) ---
+    fun getWordsNeedingPracticeFlow(): Flow<List<Word>> {
         val wordsCollection = getUserWordsCollection()
         if (wordsCollection == null) {
-            Log.e("FirebaseRepo", "User not logged in! Cannot attach words listener.")
-            callback(emptyList())
-            return null
+            Log.w("FirebaseRepo_Practice", "[getWNPFlow] User collection null. Returning emptyFlow().")
+            return emptyFlow()
         }
-        return wordsCollection
-            .addSnapshotListener { snapshot, e ->
-                if (e != null) {
-                    Log.e("FirebaseRepo", "Listener error getting words", e)
-                    callback(emptyList())
-                    return@addSnapshotListener
-                }
+        return callbackFlow {
+            val query = wordsCollection.orderBy("nextReview", Direction.ASCENDING)
+            Log.i("FirebaseRepo_Practice", "[getWNPFlow] Setting up listener. Path: ${wordsCollection.path}")
+            val listenerReg = query.addSnapshotListener { snapshot, e ->
+                if (e != null) { Log.e("FirebaseRepo_Practice", "[getWNPFlow] Listener ERROR", e); close(e); return@addSnapshotListener }
                 if (snapshot != null) {
-                    val words = snapshot.toObjects(Word::class.java)
-                    Log.d("FirebaseRepo", "Words listener updated. Count: ${words.size}")
-                    callback(words) // Повертаємо актуальний список слів
-                } else {
-                    Log.d("FirebaseRepo", "Words listener snapshot is null.")
-                    callback(emptyList()) // Повертаємо порожній список, якщо snapshot null
-                }
+                    val now = System.currentTimeMillis()
+                    val words = snapshot.toObjects(Word::class.java) // Простіше мапити так
+                    val due = words.filter { it.nextReview <= now && it.status != "mastered" }
+                    Log.i("FirebaseRepo_Practice", "[getWNPFlow] Received ${snapshot.size()} docs. Filtered to ${due.size} due words.")
+                    trySend(due).isSuccess
+                } else { Log.d("FirebaseRepo_Practice", "[getWNPFlow] Listener received NULL snapshot.") }
             }
-    }
-
-
-    fun getAllWords(callback: (List<Word>) -> Unit) {
-        val wordsCollection = getUserWordsCollection() // Отримуємо колекцію
-        if (wordsCollection == null) { // Перевірка
-            callback(emptyList())
-            return
+            awaitClose { Log.i("FirebaseRepo_Practice", "[getWNPFlow] Stopping listener."); listenerReg.remove() }
         }
-        wordsCollection
-            .get() // Одноразовий запит
-            .addOnSuccessListener { result ->
-                // @DocumentId автоматично заповнить поле 'id'
-                val words = result.documents.mapNotNull { it.toObject(Word::class.java) }
-                Log.d("FirebaseRepo", "All words fetched. Count: ${words.size}")
-                callback(words)
-            }
-            .addOnFailureListener { e ->
-                Log.e("FirebaseRepo", "Error getting all words", e)
-                callback(emptyList())
-            }
     }
 
-
-    fun getGroups(callback: (List<Group>) -> Unit): ListenerRegistration? {
-        val groupsCollection = getUserGroupsCollection()
-        if (groupsCollection == null) {
-            callback(emptyList())
-            return null
+    fun saveWord(word: Word, callback: (Boolean) -> Unit = {}) {
+        val wordsCollection = getUserWordsCollection()
+        if (wordsCollection == null || word.id.isBlank()) {
+            Log.e("FirebaseRepo", "Cannot save word. User null or word ID blank. Word ID: '${word.id}'")
+            callback(false); return
         }
-
-        return groupsCollection
-            .addSnapshotListener { snapshot, e ->
-                if (e != null) {
-                    Log.e("FirebaseRepo", "Listener error getting groups", e)
-                    callback(emptyList()) // Повертаємо порожній список у разі помилки
-                    return@addSnapshotListener
-                }
-                if (snapshot != null) {
-                    // Мапимо документи в об'єкти Group, @DocumentId заповнить id
-                    val groups = snapshot.toObjects(Group::class.java)
-                    // !!! НЕ ДОДАЄМО "Основний словник" ХАРДКОДОМ ТУТ !!!
-                    // Це відповідальність ViewModel, який готує список для діалогу
-                    Log.d("FirebaseRepo", "Groups listener updated. Count: ${groups.size}")
-                    callback(groups) // Повертаємо список груп з Firebase
-                } else {
-                    Log.d("FirebaseRepo", "Groups listener snapshot is null.")
-                    callback(emptyList()) // Повертаємо порожній список, якщо snapshot null
-                }
-            }
+        Log.d("FirebaseRepo", "Saving word '${word.text}' (ID: ${word.id}) to ${wordsCollection.path}")
+        wordsCollection.document(word.id).set(word, SetOptions.merge())
+            .addOnSuccessListener { Log.d("FirebaseRepo", "Word ${word.id} saved."); callback(true) }
+            .addOnFailureListener { e -> Log.e("FirebaseRepo", "Error saving word ${word.id}", e); callback(false) }
     }
 
+    fun getWordObject(text: String, callback: (Word?) -> Unit) { val wc=getUserWordsCollection();if(wc==null){callback(null);return};wc.whereEqualTo("text",text).limit(1).get().addOnSuccessListener{docs->callback(docs.firstOrNull()?.toObject(Word::class.java))}.addOnFailureListener{e->Log.e("FR","Err getWordObj",e);callback(null)}}
+    fun deleteWord(wordId: String, callback: (Boolean) -> Unit) { val wc=getUserWordsCollection();if(wc==null||wordId.isBlank()){callback(false);return};wc.document(wordId).delete().addOnSuccessListener{callback(true)}.addOnFailureListener{e->Log.e("FR","Err delWord",e);callback(false)}}
+    fun getWordById(wordId: String, callback: (Word?) -> Unit) { getUserWordsCollection()?.document(wordId)?.get()?.addOnSuccessListener{doc->callback(doc.toObject(Word::class.java))}?.addOnFailureListener{e->Log.e("FR","Err getWordId",e);callback(null)}?:callback(null)}
+    suspend fun getWordById_Suspend(wordId: String): Word? {val wc=getUserWordsCollection()?:return null;return try{wc.document(wordId).get().await().toObject(Word::class.java)}catch(e:Exception){Log.e("FR","Err getWordIdSus",e);null}}
+    fun getWordsListener(callback: (List<Word>) -> Unit): ListenerRegistration? { val wc=getUserWordsCollection();if(wc==null){callback(emptyList());return null};return wc.addSnapshotListener{snap,e->if(e!=null){Log.e("FR","Err wordsListen",e);callback(emptyList());return@addSnapshotListener};callback(snap?.toObjects(Word::class.java)?:emptyList())}}
+    fun getAllWords(callback: (List<Word>) -> Unit) { val wc=getUserWordsCollection();if(wc==null){callback(emptyList());return};wc.get().addOnSuccessListener{res->callback(res.documents.mapNotNull{it.toObject(Word::class.java)})}.addOnFailureListener{e->Log.e("FR","Err getAll",e);callback(emptyList())}}
+
+
+    // --- Методи для груп (Groups) ---
+    // getGroups, deleteGroup, createGroup, updateGroup - без змін від твого коду
+    // ... (скопіюй їх сюди)
+    fun getGroups(callback: (List<Group>) -> Unit): ListenerRegistration? { val gc=getUserGroupsCollection();if(gc==null){callback(emptyList());return null};return gc.addSnapshotListener{snap,e->if(e!=null){Log.e("FR","Err groupsListen",e);callback(emptyList());return@addSnapshotListener};callback(snap?.toObjects(Group::class.java)?:emptyList())}}
     suspend fun deleteGroup(groupId: String): Boolean {
-        val wordsCollection = getUserWordsCollection() // Отримуємо колекцію слів
-        val groupsCollection = getUserGroupsCollection() // Отримуємо колекцію груп
-        if (wordsCollection == null || groupsCollection == null || groupId.isBlank()) { // Перевірка
-            Log.e("FirebaseRepo", "Cannot delete group. User not logged in or group ID is blank.")
+        val wc=getUserWordsCollection();
+        val gc=getUserGroupsCollection();
+        if(wc==null||gc==null||groupId.isBlank()){
             return false
-        }
-
-        try {
-            val firestore = FirebaseFirestore.getInstance() // Отримуємо екземпляр Firestore
-            val batch = firestore.batch() // Створюємо batch операцію
-
-            // 1. Знаходимо всі слова, що належать до цієї групи
-            val wordsToDeleteQuerySnapshot = wordsCollection
-                .whereEqualTo("dictionaryId", groupId)
-                .get()
-                .await() // Чекаємо результату запиту слів у корутині
-
-            // 2. Додаємо операції оновлення для кожного знайденого слова в batch
-            // Встановлюємо dictionaryId в null (або порожній рядок)
-            for (document in wordsToDeleteQuerySnapshot.documents) {
-                val wordRef = wordsCollection.document(document.id) // Посилання на документ слова
-                batch.update(wordRef, "dictionaryId", null) // <-- Встановлюємо dictionaryId в null
-                // Або якщо ви хочете порожній рядок: batch.update(wordRef, "dictionaryId", "")
-            }
-
-            // 3. Додаємо операцію видалення самого документа групи в batch
-            val groupRef = groupsCollection.document(groupId) // Посилання на документ групи
-            batch.delete(groupRef) // Додаємо операцію видалення
-
-            // 4. Виконуємо batch операцію (оновлення слів + видалення групи)
-            batch.commit().await() // Чекаємо завершення виконання batch
-
-            Log.d("FirebaseRepo", "Group $groupId deleted and associated words updated successfully in batch.")
-            return true // Операція пройшла успішно
-        } catch (e: Exception) {
-            Log.e("FirebaseRepo", "Error deleting group $groupId with associated words.", e)
-            // Обробка помилки
-            return false // Повертаємо помилку
-        }
+        };
+        return try{
+            val batch=db.batch();
+            val wordsInGrp=wc.whereEqualTo("dictionaryId",groupId).get().await();
+            for(doc in wordsInGrp.documents){batch.update(wc.document(doc.id),"dictionaryId",null)};
+            batch.delete(gc.document(groupId));
+            batch.commit().await();
+            true
+        }catch(e:Exception){
+            Log.e("FR","Err delGrp",e);false}
     }
-
     suspend fun createGroup(name: String): Boolean {
-        val groupsCollection = getUserGroupsCollection() // Отримуємо колекцію груп
-        if (groupsCollection == null || name.isBlank()) { // Перевірка
-            Log.e("FirebaseRepo", "Cannot create group. User not logged in or group name is blank.")
+        val gc=getUserGroupsCollection();
+        if(gc==null||name.isBlank()){
             return false
-        }
-
-        try {
-            val groupId = groupsCollection.document().id
-            val newGroup = Group(id = groupId, name = name)
-
-            groupsCollection.document(groupId).set(newGroup).await()
-
-            Log.d("FirebaseRepo", "Group ${groupId} '${name}' created successfully.")
-            return true
-        } catch (e: Exception) {
-            Log.e("FirebaseRepo", "Error creating group with name '${name}'.", e)
-            return false
-        }
+        };return try
+        {val grpId=gc.document().id;gc.document(grpId).set(Group(id=grpId,name=name)).await();
+            true
+        }catch(e:Exception){Log.e("FR","Err createGrp",e);
+            false}
     }
-
-    suspend fun updateGroup(groupId: String, newName: String): Boolean {
-        val groupsCollection = getUserGroupsCollection() // Отримуємо колекцію груп
-        if (groupsCollection == null || groupId.isBlank() || newName.isBlank()) { // Перевірка
-            Log.e("FirebaseRepo", "Cannot update group. User not logged in, group ID is blank, or new name is blank.")
-            return false
-        }
-
-        try {
-            groupsCollection.document(groupId).update("name", newName).await()
-
-            Log.d("FirebaseRepo", "Group $groupId updated name to '${newName}' successfully.")
-            return true
-        } catch (e: Exception) {
-            Log.e("FirebaseRepo", "Error updating group $groupId with name '${newName}'.", e)
-            return false
-        }
-    }
+    suspend fun updateGroup(groupId: String, newName: String): Boolean { val gc=getUserGroupsCollection();if(gc==null||groupId.isBlank()||newName.isBlank()){return false};return try{gc.document(groupId).update("name",newName).await();true}catch(e:Exception){Log.e("FR","Err updateGrp",e);false}}
 }
