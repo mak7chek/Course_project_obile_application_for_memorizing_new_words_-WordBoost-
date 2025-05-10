@@ -118,7 +118,6 @@ fun Course_project_obile_application_for_memorizing_new_words_WordBoostTheme(
         else -> LightColorScheme
     }
 
-    // SideEffect для керування кольором статус-бара
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {

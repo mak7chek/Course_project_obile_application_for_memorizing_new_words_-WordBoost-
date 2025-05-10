@@ -13,7 +13,7 @@ data class SharedCardSet(
     var authorId: String = "",       // UID користувача-автора
     var authorName: String? = null,  // Ім'я користувача-автора (для відображення)
     var difficultyLevel: String = DifficultyLevel.MEDIUM.key, // Рівень складності (Крок 2), зберігаємо ключ enum
-    var isPublic: Boolean = true,    // Видимість набору (Крок 4)
+    var public: Boolean = true,    // Видимість набору (Крок 4)
     val languageOriginal: String = "en", // Зафіксовано для англо-українських наборів
     val languageTranslation: String = "uk", // Зафіксовано
     var wordCount: Int = 0,          // Кількість слів, оновлюється при збереженні

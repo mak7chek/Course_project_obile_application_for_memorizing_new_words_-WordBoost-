@@ -16,15 +16,15 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
 import kotlin.coroutines.resume
+import com.example.wordboost.data.model.UserSharedSetProgress
+import com.example.wordboost.viewmodel.SharedSetDetailsWithWords
 class FirebaseRepository(private val authRepository: AuthRepository) {
-
     private val db = Firebase.firestore
 
     private fun getUserWordsCollectionPath(): String? {
         val userId = authRepository.getCurrentUser()?.uid
         return if (userId != null) "users/$userId/words" else null
     }
-
     private fun getUserWordsCollection() = authRepository.getCurrentUser()?.uid?.let { userId ->
         Log.i("FirebaseRepo_User", "getUserWordsCollection: Accessing words for userId: $userId")
         db.collection("users").document(userId).collection("words")
@@ -63,7 +63,7 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
                         authorName = it.authorName, // Або просто userId, якщо ім'я не зберігається тут
                         wordCount = it.wordCount,
                         difficultyLevelKey = it.difficultyLevel,
-                        isPublic = it.isPublic,
+                        public = it.public,
                         createdAt = it.createdAt
                     )
                 }
@@ -75,13 +75,53 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
             Result.failure(e)
         }
     }
+    suspend fun getUserProgressForSharedSet(userId: String, sharedSetId: String): UserSharedSetProgress? {
+        if (userId.isBlank() || sharedSetId.isBlank()) return null
+        Log.d("FirebaseRepo", "Fetching user progress for userId: $userId, setId: $sharedSetId")
+        return try {
+            db.collection("users").document(userId)
+                .collection("browsedSharedSetsProgress").document(sharedSetId)
+                .get().await().toObject(UserSharedSetProgress::class.java)
+        } catch (e: Exception) {
+            Log.e("FirebaseRepo", "Error fetching user progress for userId: $userId, setId: $sharedSetId", e)
+            null
+        }
+    }
+
+    suspend fun savePersonalWordSuspend(word: Word): Boolean {
+        if (word.id.isBlank()) {
+            // Якщо ID порожній, це може бути помилкою або Firestore сам згенерує,
+            // але краще мати ID з ViewModel (наприклад, UUID.randomUUID().toString())
+            Log.e("FirebaseRepo", "[savePersonalWordSuspend] Word ID is blank for word: ${word.text}")
+            // return false // Можна повернути помилку, якщо ID обов'язковий
+        }
+        Log.d("FirebaseRepo", "[savePersonalWordSuspend] Saving personal word '${word.text}' with ID '${word.id}'")
+        return suspendCancellableCoroutine { continuation ->
+            saveWord(word) { success -> // Викликаємо твій існуючий saveWord з колбеком
+                if (continuation.isActive) {
+                    continuation.resume(success)
+                }
+            }
+        }
+    }
+    suspend fun saveUserProgressForSharedSet(userId: String, sharedSetId: String, progress: UserSharedSetProgress): Boolean {
+        if (userId.isBlank() || sharedSetId.isBlank()) return false
+        Log.d("FirebaseRepo", "Saving user progress for userId: $userId, setId: $sharedSetId. Index: ${progress.currentWordIndex}, Completed: ${progress.isCompleted}")
+        return try {
+            db.collection("users").document(userId)
+                .collection("browsedSharedSetsProgress").document(sharedSetId)
+                .set(progress, SetOptions.merge()) // SetOptions.merge для оновлення або створення
+                .await()
+            true
+        } catch (e: Exception) {
+            Log.e("FirebaseRepo", "Error saving user progress for userId: $userId, setId: $sharedSetId", e)
+            false
+        }
+    }
     suspend fun getPublicSharedSets(currentUserId: String): Result<List<SharedCardSetSummary>> {
         return try {
             val query = getSharedSetsCollection()
-                .whereEqualTo("isPublic", true)
-                // Опціонально: можна додати .whereNotEqualTo("authorId", currentUserId),
-                // але Firestore має обмеження на != у комбінації з іншими фільтрами/сортуванням.
-                // Простіше може бути відфільтрувати на клієнті, якщо потрібно.
+                .whereEqualTo("public", true)
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .limit(50) // Обмежимо кількість для початку
 
@@ -97,7 +137,7 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
                         authorName = it.authorName,
                         wordCount = it.wordCount,
                         difficultyLevelKey = it.difficultyLevel,
-                        isPublic = it.isPublic,
+                        public = it.public,
                         createdAt = it.createdAt
                     )
                 }
@@ -109,6 +149,35 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
             Result.failure(e)
         }
     }
+    suspend fun getSharedCardSetWithWords(setId: String): Result<SharedSetDetailsWithWords> {
+        if (setId.isBlank()) return Result.failure(IllegalArgumentException("Set ID cannot be blank."))
+        Log.d("FirebaseRepo", "Fetching shared set with words for ID: $setId")
+        return try {
+            val setDocRef = getSharedSetsCollection().document(setId)
+            val setSnapshot = setDocRef.get().await()
+            val sharedSet = setSnapshot.toObject(SharedCardSet::class.java)
+
+            if (sharedSet == null) {
+                Log.w("FirebaseRepo", "SharedCardSet with ID $setId not found.")
+                return Result.failure(NoSuchElementException("SharedCardSet not found."))
+            }
+
+            val wordsSnapshot = setDocRef.collection("words")
+                // .orderBy("addedAt", Query.Direction.ASCENDING) // Опціонально, якщо є поле addedAt і потрібне сортування
+                .get()
+                .await()
+
+            val wordsList = wordsSnapshot.documents.mapNotNull { doc ->
+                doc.toObject(SharedSetWordItem::class.java)
+            }
+            Log.d("FirebaseRepo", "Fetched ${wordsList.size} words for set $setId.")
+            Result.success(SharedSetDetailsWithWords(sharedSet, wordsList))
+        } catch (e: Exception) {
+            Log.e("FirebaseRepo", "Error fetching shared set with words for ID $setId", e)
+            Result.failure(e)
+        }
+    }
+
     suspend fun getTranslationSuspend(text: String): String? {
         val trimmedText = text.trim()
         if (trimmedText.isBlank()) {

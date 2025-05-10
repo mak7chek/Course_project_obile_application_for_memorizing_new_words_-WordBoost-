@@ -11,6 +11,6 @@ data class SharedCardSetSummary(
     val authorName: String? = null, // Або authorId, якщо ім'я будеш завантажувати окремо
     val wordCount: Int = 0,
     val difficultyLevelKey: String? = null, // Ключ з DifficultyLevel enum
-    val isPublic: Boolean = false,
+    val public: Boolean = false,
     @ServerTimestamp var createdAt: Date? = null // Для сортування "новіші спочатку"
 )

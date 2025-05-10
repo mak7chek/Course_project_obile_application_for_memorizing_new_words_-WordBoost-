@@ -192,7 +192,7 @@ class CreateSetViewModel(
             authorId = user.uid,
             authorName = user.displayName ?: user.email,
             difficultyLevel = selectedDifficulty.value.key,
-            isPublic = isSetPublic.value
+            public = isSetPublic.value
         )
 
         viewModelScope.launch {

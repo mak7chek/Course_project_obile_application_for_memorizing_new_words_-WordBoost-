@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -26,12 +25,8 @@ import com.example.wordboost.viewmodel.SetsViewModelFactory
 import com.example.wordboost.viewmodel.WordListViewModelFactory
 import kotlinx.coroutines.launch
 
-// Імпорти для Material 3 Pull-to-Refresh
-// Переконайся, що ці шляхи актуальні для твоєї версії Material 3
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-
-// Необхідний імпорт для делегування 'by' з State
 import androidx.compose.runtime.getValue
 
 // --- Екран "Набори" (SetsScreen) ---
@@ -180,7 +175,7 @@ fun SharedCardSetSummaryItem(
             summary.authorName?.let {
                 Text("Автор: $it", style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic)
             }
-            if(summary.isPublic){
+            if(summary.public){
                 Text("Публічний", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
         }

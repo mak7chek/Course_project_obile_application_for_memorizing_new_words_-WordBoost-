@@ -25,7 +25,8 @@ import com.example.wordboost.viewmodel.TranslateViewModelFactory // Можлив
 import com.example.wordboost.viewmodel.WordListViewModelFactory
 import com.example.wordboost.viewmodel.SetsViewModelFactory // Додано factory для SetsScreen
 import com.example.wordboost.ui.screens.createset.CreateSetScreen
-
+import com.example.wordboost.viewmodel.BrowseSharedSetViewModel
+import com.example.wordboost.viewmodel.BrowseSetViewModelFactory
 enum class TopLevelScreenState {
     Loading,
     AuthFlow,
@@ -34,7 +35,8 @@ enum class TopLevelScreenState {
     PracticeSessionFullScreen,
     WordListFullScreen,
     EditWordFullScreen,
-    CreateSetWizardFullScreen
+    CreateSetWizardFullScreen,
+    BrowseSharedSetFullScreen
 }
 
 enum class AuthSubState {
@@ -52,7 +54,7 @@ fun MainScreen(
     var currentTopLevelScreenState by remember { mutableStateOf(TopLevelScreenState.Loading) }
     var currentAuthSubState by remember { mutableStateOf(AuthSubState.AuthChoice) }
     var editingWordIdForFullScreen by remember { mutableStateOf<String?>(null) }
-
+    var currentSetIdForBrowse by remember { mutableStateOf<String?>(null) }
     // --- Factories ---
     val practiceViewModelFactory = remember(practiceRepo, ttsService, authRepo) {
         PracticeViewModelFactory(repository = practiceRepo, ttsService = ttsService, authRepository = authRepo)
@@ -72,7 +74,6 @@ fun MainScreen(
     val setsViewModelFactory = remember(firebaseRepo, authRepo) {
         SetsViewModelFactory(firebaseRepository = firebaseRepo, authRepository = authRepo)
     }
-
     LaunchedEffect(key1 = authRepo) { // key1 для уникнення попередження, можна Unit, якщо authRepo не змінюється
         Log.d("MainScreen", "Auth state listener collection started.")
         authRepo.getAuthState().collect { user ->
@@ -194,6 +195,43 @@ fun MainScreen(
                     }
                 )
             }
+            TopLevelScreenState.BrowseSharedSetFullScreen -> {
+                val currentSetId = currentSetIdForBrowse // Для стабільності в LaunchedEffect/remember
+                Log.i("MainScreen_Nav", "Composing content for BrowseSharedSetFullScreen with setId: $currentSetId")
+
+                currentSetId?.let { setIdValue ->
+                    val browseSetViewModelFactory = remember(firebaseRepo, authRepo, ttsService, setIdValue) {
+                        Log.d("MainScreen_Nav", "Creating BrowseSetViewModelFactory for setId: $setIdValue")
+                        BrowseSetViewModelFactory(
+                            sharedSetId = setIdValue,
+                            firebaseRepository = firebaseRepo,
+                            authRepository = authRepo,
+                            ttsService = ttsService
+                        )
+                    }
+                    val browseSetViewModel: BrowseSharedSetViewModel = viewModel(factory = browseSetViewModelFactory)
+                    Log.d("MainScreen_Nav", "BrowseSharedSetViewModel instance obtained for setId: $setIdValue")
+
+                    // ОСЬ ТУТ ВИКЛИКАЄТЬСЯ BrowseSharedSetScreen
+                    BrowseSharedSetScreen(
+                        viewModel = browseSetViewModel,
+                        onBack = {
+                            Log.d("MainScreen_Nav", "Navigating back from BrowseSharedSetScreen (setId was: $setIdValue)")
+                            currentSetIdForBrowse = null // Важливо скинути ID
+                            currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp
+                        }
+                    )
+                } ?: run {
+                    // Цей блок виконається, якщо currentSetIdForBrowse раптом стане null
+                    // після того, як currentTopLevelScreenState вже BrowseSharedSetFullScreen.
+                    Log.e("MainScreen_Nav", "Error: currentSetIdForBrowse is null when in BrowseSharedSetFullScreen state. Returning to AuthenticatedApp.")
+                    // Безпечне повернення, якщо щось пішло не так з ID
+                    LaunchedEffect(Unit) { // Щоб уникнути зміни стану під час композиції
+                        currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp
+                    }
+                }
+            }
+
         }
     }
 }
