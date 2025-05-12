@@ -16,7 +16,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.ui.unit.IntOffset
 import  com.example.wordboost.ui.components.SharedWordDisplayCard
 
-fun Offset.toIntOffset() = IntOffset(x.toInt(), y.toInt())
 
 
 @OptIn(ExperimentalMaterial3Api::class)

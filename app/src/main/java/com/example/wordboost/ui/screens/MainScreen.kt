@@ -1,4 +1,3 @@
-// com.example.wordboost.ui.screens.MainScreen.kt
 package com.example.wordboost.ui.screens
 
 import android.util.Log
@@ -21,12 +20,14 @@ import com.example.wordboost.viewmodel.CreateSetViewModel
 import com.example.wordboost.viewmodel.CreateSetViewModelFactory
 import com.example.wordboost.viewmodel.EditWordViewModelFactory
 import com.example.wordboost.viewmodel.PracticeViewModelFactory
+import com.example.wordboost.ui.screens.BrowseSharedSetScreen
 import com.example.wordboost.viewmodel.TranslateViewModelFactory // Можливо, знадобиться, якщо TranslateScreen приймає factory
 import com.example.wordboost.viewmodel.WordListViewModelFactory
 import com.example.wordboost.viewmodel.SetsViewModelFactory // Додано factory для SetsScreen
 import com.example.wordboost.ui.screens.createset.CreateSetScreen
 import com.example.wordboost.viewmodel.BrowseSharedSetViewModel
 import com.example.wordboost.viewmodel.BrowseSetViewModelFactory
+
 enum class TopLevelScreenState {
     Loading,
     AuthFlow,
@@ -55,25 +56,16 @@ fun MainScreen(
     var currentAuthSubState by remember { mutableStateOf(AuthSubState.AuthChoice) }
     var editingWordIdForFullScreen by remember { mutableStateOf<String?>(null) }
     var currentSetIdForBrowse by remember { mutableStateOf<String?>(null) }
+    var editingSetId by remember { mutableStateOf<String?>(null) } // Для ID набору, що редагується
+
     // --- Factories ---
-    val practiceViewModelFactory = remember(practiceRepo, ttsService, authRepo) {
-        PracticeViewModelFactory(repository = practiceRepo, ttsService = ttsService, authRepository = authRepo)
-    }
-    val wordListViewModelFactory = remember(firebaseRepo, authRepo, ttsService) {
-        WordListViewModelFactory(repository = firebaseRepo, authRepository = authRepo, ttsService = ttsService)
-    }
-    val editWordViewModelFactoryBuilder = remember(firebaseRepo) {
-        // Приймає wordId і повертає Factory
-        { wordId: String? -> EditWordViewModelFactory(repository = firebaseRepo, wordId = wordId) }
-    }
-    // translateViewModelFactory тут не створюється, оскільки TranslateScreen напряму приймає репозиторії.
-    // Якщо TranslateScreen буде використовувати ViewModel, тут потрібно буде створити factory.
-    val createSetViewModelFactory = remember(firebaseRepo, translationRepo, authRepo) {
-        CreateSetViewModelFactory(firebaseRepository = firebaseRepo, translationRepository = translationRepo, authRepository = authRepo)
-    }
-    val setsViewModelFactory = remember(firebaseRepo, authRepo) {
-        SetsViewModelFactory(firebaseRepository = firebaseRepo, authRepository = authRepo)
-    }
+    // ... (твій код для factories, він виглядав правильно)
+    val practiceViewModelFactory = remember(practiceRepo, ttsService, authRepo) { PracticeViewModelFactory(repository = practiceRepo, ttsService = ttsService, authRepository = authRepo) }
+    val wordListViewModelFactory = remember(firebaseRepo, authRepo, ttsService) { WordListViewModelFactory(repository = firebaseRepo, authRepository = authRepo, ttsService = ttsService) }
+    val editWordViewModelFactoryBuilder = remember(firebaseRepo) { { wordId: String? -> EditWordViewModelFactory(repository = firebaseRepo, wordId = wordId) } }
+    val createSetViewModelFactory = remember(firebaseRepo, translationRepo, authRepo) { CreateSetViewModelFactory(firebaseRepository = firebaseRepo, translationRepository = translationRepo, authRepository = authRepo) }
+    val setsViewModelFactory = remember(firebaseRepo, authRepo) { SetsViewModelFactory(firebaseRepository = firebaseRepo, authRepository = authRepo) }
+    // Factory для BrowseSharedSetViewModel буде створюватися динамічно нижче
     LaunchedEffect(key1 = authRepo) { // key1 для уникнення попередження, можна Unit, якщо authRepo не змінюється
         Log.d("MainScreen", "Auth state listener collection started.")
         authRepo.getAuthState().collect { user ->
@@ -129,17 +121,26 @@ fun MainScreen(
                 }
             }
             TopLevelScreenState.AuthenticatedApp -> {
-                Log.d("MainScreen", "Showing AuthenticatedAppScaffold")
+                Log.i("MainScreen_Render", "Showing AuthenticatedAppScaffold UI")
                 AuthenticatedAppScaffold(
                     onNavigateToTranslate = { currentTopLevelScreenState = TopLevelScreenState.TranslateWordFullScreen },
                     onNavigateToPractice = { currentTopLevelScreenState = TopLevelScreenState.PracticeSessionFullScreen },
                     onNavigateToWordList = { currentTopLevelScreenState = TopLevelScreenState.WordListFullScreen },
-                    onNavigateToCreateSet = { currentTopLevelScreenState = TopLevelScreenState.CreateSetWizardFullScreen },
+                    onNavigateToCreateSet = {
+                        editingSetId = null // Скидаємо ID редагування, бо це створення нового
+                        currentTopLevelScreenState = TopLevelScreenState.CreateSetWizardFullScreen
+                    },
                     onLogoutClick = { authRepo.logout() },
                     onNavigateToBrowseSet = { setId ->
-                        Log.d("MainScreen", "Navigate to browse set ID: $setId (TODO: Implement this navigation)")
-                        // Тут буде логіка переходу на екран перегляду конкретного набору,
-                        // можливо, встановлення editingWordIdForFullScreen = setId та новий TopLevelScreenState.
+                        Log.i("MainScreen_Nav", "Action to browse set ID: '$setId'. Changing TopLevelScreenState to BrowseSharedSetFullScreen.")
+                        currentSetIdForBrowse = setId
+                        currentTopLevelScreenState = TopLevelScreenState.BrowseSharedSetFullScreen
+                    },
+                    // !!! ДОДАНО КОЛБЕК onNavigateToEditSet !!!
+                    onNavigateToEditSet = { setIdToEdit ->
+                        Log.i("MainScreen_Nav", "Action to EDIT set ID: '$setIdToEdit'. Changing TopLevelScreenState to CreateSetWizardFullScreen for editing.")
+                        editingSetId = setIdToEdit // Зберігаємо ID набору, що редагується
+                        currentTopLevelScreenState = TopLevelScreenState.CreateSetWizardFullScreen // Йдемо на той самий екран створення/редагування
                     },
                     wordListViewModelFactory = wordListViewModelFactory,
                     setsViewModelFactory = setsViewModelFactory
@@ -184,49 +185,71 @@ fun MainScreen(
                     }
                 )
             }
+
             TopLevelScreenState.CreateSetWizardFullScreen -> {
-                Log.d("MainScreen", "Showing CreateSetWizardFullScreen")
-                val createSetViewModel: CreateSetViewModel = viewModel(factory = createSetViewModelFactory)
-                CreateSetScreen( // Цей виклик тепер має працювати, якщо CreateSetScreen імпортовано
+                Log.i("MainScreen_Render", "Showing CreateSetWizardFullScreen. Current editingSetId: $editingSetId")
+                // Використовуємо editingSetId як ключ для ViewModel, щоб вона перестворювалася
+                // для "створення нового" (коли editingSetId = null) або для редагування конкретного набору.
+                val currentCreateEditSetId = editingSetId // Захоплюємо значення для ключа
+                val createSetViewModel: CreateSetViewModel = viewModel(
+                    key = currentCreateEditSetId ?: "create_new_set_mode", // Унікальний ключ
+                    factory = createSetViewModelFactory
+                )
+
+                // LaunchedEffect для завантаження даних, якщо це режим редагування
+                LaunchedEffect(currentCreateEditSetId, createSetViewModel) { // Залежить від ID та екземпляра ViewModel
+                    if (currentCreateEditSetId != null) {
+                        Log.d("MainScreen_CreateSet", "editingSetId is '$currentCreateEditSetId', calling loadSetForEditing.")
+                        createSetViewModel.loadSetForEditing(currentCreateEditSetId)
+                    } else {
+                        Log.d("MainScreen_CreateSet", "editingSetId is null, resetting ViewModel for new set creation (if needed).")
+                        // createSetViewModel.resetAllState() // Розглянь, чи це потрібно тут,
+                        // оскільки новий ключ для viewModel() має створювати новий екземпляр.
+                        // resetAllState викликається при onCloseOrNavigateBack.
+                    }
+                }
+
+                CreateSetScreen(
                     viewModel = createSetViewModel,
+                    isEditing = currentCreateEditSetId != null, // Передаємо прапорець режиму редагування
                     onCloseOrNavigateBack = {
+                        Log.d("MainScreen_CreateSet", "Closing CreateSetWizard. Resetting ViewModel and editingSetId.")
                         createSetViewModel.resetAllState()
+                        editingSetId = null // Дуже важливо скинути ID редагування при виході
                         currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp
                     }
                 )
             }
             TopLevelScreenState.BrowseSharedSetFullScreen -> {
-                val currentSetId = currentSetIdForBrowse // Для стабільності в LaunchedEffect/remember
-                Log.i("MainScreen_Nav", "Composing content for BrowseSharedSetFullScreen with setId: $currentSetId")
+                val setIdForView = currentSetIdForBrowse
+                Log.i("MainScreen_Nav", "Composing content for BrowseSharedSetFullScreen with setId: $setIdForView")
 
-                currentSetId?.let { setIdValue ->
-                    val browseSetViewModelFactory = remember(firebaseRepo, authRepo, ttsService, setIdValue) {
-                        Log.d("MainScreen_Nav", "Creating BrowseSetViewModelFactory for setId: $setIdValue")
+                if (setIdForView != null) {
+                    Log.d("MainScreen_Nav", "Set ID '$setIdForView' is not null, proceeding to create ViewModel and Screen.")
+                    val browseSetViewModelFactory = remember(firebaseRepo, authRepo, ttsService, setIdForView) {
+                        Log.d("MainScreen_Nav", "Creating BrowseSetViewModelFactory for setId: $setIdForView")
                         BrowseSetViewModelFactory(
-                            sharedSetId = setIdValue,
+                            sharedSetId = setIdForView,
                             firebaseRepository = firebaseRepo,
                             authRepository = authRepo,
                             ttsService = ttsService
                         )
                     }
-                    val browseSetViewModel: BrowseSharedSetViewModel = viewModel(factory = browseSetViewModelFactory)
-                    Log.d("MainScreen_Nav", "BrowseSharedSetViewModel instance obtained for setId: $setIdValue")
+                    val browseSetViewModel: BrowseSharedSetViewModel = viewModel(key = "BrowseVM_$setIdForView", factory = browseSetViewModelFactory)
+                    Log.d("MainScreen_Nav", "BrowseSharedSetViewModel instance obtained for setId: $setIdForView. ViewModel: $browseSetViewModel")
 
-                    // ОСЬ ТУТ ВИКЛИКАЄТЬСЯ BrowseSharedSetScreen
                     BrowseSharedSetScreen(
                         viewModel = browseSetViewModel,
                         onBack = {
-                            Log.d("MainScreen_Nav", "Navigating back from BrowseSharedSetScreen (setId was: $setIdValue)")
-                            currentSetIdForBrowse = null // Важливо скинути ID
+                            Log.i("MainScreen_Nav", "Back pressed from BrowseSharedSetScreen. Set ID was: $setIdForView")
+                            currentSetIdForBrowse = null
                             currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp
                         }
                     )
-                } ?: run {
-                    // Цей блок виконається, якщо currentSetIdForBrowse раптом стане null
-                    // після того, як currentTopLevelScreenState вже BrowseSharedSetFullScreen.
-                    Log.e("MainScreen_Nav", "Error: currentSetIdForBrowse is null when in BrowseSharedSetFullScreen state. Returning to AuthenticatedApp.")
-                    // Безпечне повернення, якщо щось пішло не так з ID
-                    LaunchedEffect(Unit) { // Щоб уникнути зміни стану під час композиції
+                    Log.d("MainScreen_Nav", "BrowseSharedSetScreen composed for $setIdForView.")
+                } else {
+                    Log.e("MainScreen_Nav", "Error: currentSetIdForBrowse is NULL when trying to display BrowseSharedSetFullScreen. Navigating back to AuthenticatedApp.")
+                    LaunchedEffect(Unit) { // Щоб безпечно змінити стан не під час композиції
                         currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp
                     }
                 }

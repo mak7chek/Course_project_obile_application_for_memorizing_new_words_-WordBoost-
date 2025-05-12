@@ -2,7 +2,6 @@ package com.example.wordboost.data.firebase
 
 import android.util.Log
 import com.example.wordboost.data.model.*
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Query.Direction
@@ -18,9 +17,11 @@ import kotlinx.coroutines.tasks.await
 import kotlin.coroutines.resume
 import com.example.wordboost.data.model.UserSharedSetProgress
 import com.example.wordboost.viewmodel.SharedSetDetailsWithWords
+import com.google.firebase.firestore.QuerySnapshot
+
 class FirebaseRepository(private val authRepository: AuthRepository) {
     private val db = Firebase.firestore
-
+    private val TAG: String = "FirestoreHelper"
     private fun getUserWordsCollectionPath(): String? {
         val userId = authRepository.getCurrentUser()?.uid
         return if (userId != null) "users/$userId/words" else null
@@ -42,6 +43,142 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
     }
 
     private fun getSharedSetsCollection() = db.collection("sharedCardSets")
+    suspend fun updateSharedCardSetAndWords(
+        setWithUpdates: SharedCardSet, // Цей об'єкт вже має містити правильний set.id
+        updatedWords: List<SharedSetWordItem>
+    ): Result<Unit> {
+        val currentUserUid = authRepository.getCurrentUser()?.uid
+        if (currentUserUid == null) {
+            Log.e("FirebaseRepo", "[updateSet] User not authenticated.")
+            return Result.failure(IllegalStateException("User not authenticated."))
+        }
+        if (setWithUpdates.id.isBlank()) {
+            Log.e("FirebaseRepo", "[updateSet] Set ID for update cannot be blank.")
+            return Result.failure(IllegalArgumentException("Set ID for update cannot be blank."))
+        }
+        // Перевірка, чи користувач є автором і не намагається змінити авторство
+        if (setWithUpdates.authorId != currentUserUid) {
+            Log.e("FirebaseRepo", "[updateSet] Attempt to change authorship or update set not owned by user. Current: $currentUserUid, SetAuthor: ${setWithUpdates.authorId}")
+            return Result.failure(SecurityException("Cannot change set authorship or update set not owned by user."))
+        }
+
+        Log.d("FirebaseRepo", "[updateSet] Attempting to update shared set with ID: ${setWithUpdates.id} by user: $currentUserUid")
+        val setDocRef = getSharedSetsCollection().document(setWithUpdates.id)
+
+        return try {
+            // Переконуємося, що оновлюємо wordCount та, можливо, updatedAt (хоча updatedAt оновиться сервером)
+            val finalSetData = setWithUpdates.copy(
+                wordCount = updatedWords.size,
+                updatedAt = null // Встановлюємо null, щоб @ServerTimestamp спрацював для оновлення
+            )
+
+            // Крок 1: Отримуємо посилання на всі існуючі слова для їх видалення
+            val existingWordDocsSnapshot: QuerySnapshot
+            try {
+                existingWordDocsSnapshot = setDocRef.collection("words").get().await()
+                Log.d("FirebaseRepo", "[updateSet] Found ${existingWordDocsSnapshot.size()} existing words for set ${setWithUpdates.id}")
+            } catch (e: Exception) {
+                Log.e("FirebaseRepo", "[updateSet] Error fetching existing words for deletion for set ${setWithUpdates.id}", e)
+                return Result.failure(e) // Помилка при читанні слів перед оновленням
+            }
+
+            // Крок 2: Виконуємо пакетну операцію
+            db.runBatch { batch ->
+                // 2.1: Додаємо операції видалення для всіх існуючих слів
+                if (!existingWordDocsSnapshot.isEmpty) {
+                    for (doc in existingWordDocsSnapshot.documents) {
+                        batch.delete(doc.reference)
+                    }
+                    Log.d("FirebaseRepo", "[updateSet] Scheduled deletion of ${existingWordDocsSnapshot.size()} old words.")
+                }
+
+                // 2.2: Додаємо нові/оновлені слова
+                val wordsSubCollectionRef = setDocRef.collection("words")
+                updatedWords.forEach { wordItem ->
+                    // Для кожного слова генеруємо новий ID, оскільки ми перезаписуємо підколекцію.
+                    // Або, якщо ти хочеш зберегти ID слів, що редагуються, потрібна складніша логіка.
+                    // Для простоти - генеруємо нові ID для всіх слів при оновленні.
+                    val newWordDocRef = wordsSubCollectionRef.document() // Новий ID для кожного слова
+
+                    // Переконуємося, що authorId є у слова, якщо правила цього вимагають.
+                    // Оскільки правила для words/write тепер перевіряють authorId батьківського набору,
+                    // authorId у самому слові не є критичним для правил ЗАПИСУ/ОНОВЛЕННЯ/ВИДАЛЕННЯ слів,
+                    // але він потрібен для правила СТВОРЕННЯ слів, якщо воно окреме.
+                    // Краще його мати для консистентності.
+                    val finalWordItem = if (wordItem.authorId.isBlank()) {
+                        wordItem.copy(id = newWordDocRef.id, authorId = currentUserUid)
+                    } else {
+                        wordItem.copy(id = newWordDocRef.id) // Використовуємо новий ID
+                    }
+                    batch.set(newWordDocRef, finalWordItem)
+                }
+                Log.d("FirebaseRepo", "[updateSet] Scheduled add/update of ${updatedWords.size} words.")
+
+                // 2.3: Оновлюємо основний документ набору
+                // Використовуємо SetOptions.merge(), щоб оновити тільки передані поля,
+                // або .set(finalSetData) для повного перезапису (якщо createdAt/updatedAt керуються тільки сервером).
+                // Оскільки finalSetData містить всі поля, .set() є нормальним.
+                batch.set(setDocRef, finalSetData)
+                Log.d("FirebaseRepo", "[updateSet] Scheduled update for main document for set ${setWithUpdates.id}.")
+
+            }.await() // Чекаємо завершення пакетної операції
+
+            Log.i("FirebaseRepo", "[updateSet] SharedCardSet with ID: ${setWithUpdates.id} and its words updated successfully.")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("FirebaseRepo", "[updateSet] Error updating SharedCardSet with ID: ${setWithUpdates.id}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteSharedCardSet(setId: String): Result<Unit> {
+        val currentUserUid = authRepository.getCurrentUser()?.uid
+        if (currentUserUid == null) {
+            Log.e("FirebaseRepo", "deleteSharedCardSet: User not authenticated.")
+            return Result.failure(IllegalStateException("User not authenticated."))
+        }
+        if (setId.isBlank()) {
+            Log.e("FirebaseRepo", "deleteSharedCardSet: Set ID is blank.")
+            return Result.failure(IllegalArgumentException("Set ID cannot be blank."))
+        }
+
+        Log.d("FirebaseRepo", "Attempting to delete shared set with ID: $setId by user: $currentUserUid")
+
+        return try {
+            val setDocRef = getSharedSetsCollection().document(setId)
+
+            val setToDeleteSnapshot = setDocRef.get().await()
+            if (!setToDeleteSnapshot.exists()) {
+                Log.w("FirebaseRepo", "deleteSharedCardSet: Set with ID $setId does not exist. Nothing to delete.")
+                return Result.success(Unit)
+            }
+            val setToDelete = setToDeleteSnapshot.toObject(SharedCardSet::class.java)
+            if (setToDelete?.authorId != currentUserUid) {
+                Log.w("FirebaseRepo", "deleteSharedCardSet: User $currentUserUid is not the author of set $setId (author: ${setToDelete?.authorId}). This action should be denied by security rules.")
+                return Result.failure(SecurityException("User is not the author of the set."))
+            }
+
+            val wordsQuerySnapshot = setDocRef.collection("words").get().await()
+            Log.d("FirebaseRepo", "Found ${wordsQuerySnapshot.size()} words in subcollection of set $setId to delete.")
+
+            db.runBatch { batch ->
+                if (!wordsQuerySnapshot.isEmpty) {
+                    for (wordDoc in wordsQuerySnapshot.documents) {
+                        batch.delete(wordDoc.reference)
+                    }
+                }
+                batch.delete(setDocRef)
+                Log.d("FirebaseRepo", "Main document for set $setId and its ${wordsQuerySnapshot.size()} words added to delete batch.")
+
+            }.await()
+
+            Log.i("FirebaseRepo", "SharedCardSet with ID: $setId and its words deleted successfully.")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("FirebaseRepo", "Error deleting SharedCardSet with ID: $setId", e)
+            Result.failure(e)
+        }
+    }
 
     suspend fun getMySharedSets(userId: String): Result<List<SharedCardSetSummary>> {
         if (userId.isBlank()) return Result.failure(IllegalArgumentException("User ID cannot be blank"))
@@ -337,12 +474,132 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
             .addOnFailureListener { e -> Log.e("FirebaseRepo", "Error saving word ${word.id}", e); callback(false) }
     }
 
-    fun getWordObject(text: String, callback: (Word?) -> Unit) { val wc=getUserWordsCollection();if(wc==null){callback(null);return};wc.whereEqualTo("text",text).limit(1).get().addOnSuccessListener{docs->callback(docs.firstOrNull()?.toObject(Word::class.java))}.addOnFailureListener{e->Log.e("FR","Err getWordObj",e);callback(null)}}
-    fun deleteWord(wordId: String, callback: (Boolean) -> Unit) { val wc=getUserWordsCollection();if(wc==null||wordId.isBlank()){callback(false);return};wc.document(wordId).delete().addOnSuccessListener{callback(true)}.addOnFailureListener{e->Log.e("FR","Err delWord",e);callback(false)}}
-    fun getWordById(wordId: String, callback: (Word?) -> Unit) { getUserWordsCollection()?.document(wordId)?.get()?.addOnSuccessListener{doc->callback(doc.toObject(Word::class.java))}?.addOnFailureListener{e->Log.e("FR","Err getWordId",e);callback(null)}?:callback(null)}
-    suspend fun getWordById_Suspend(wordId: String): Word? {val wc=getUserWordsCollection()?:return null;return try{wc.document(wordId).get().await().toObject(Word::class.java)}catch(e:Exception){Log.e("FR","Err getWordIdSus",e);null}}
-    fun getWordsListener(callback: (List<Word>) -> Unit): ListenerRegistration? { val wc=getUserWordsCollection();if(wc==null){callback(emptyList());return null};return wc.addSnapshotListener{snap,e->if(e!=null){Log.e("FR","Err wordsListen",e);callback(emptyList());return@addSnapshotListener};callback(snap?.toObjects(Word::class.java)?:emptyList())}}
-    fun getAllWords(callback: (List<Word>) -> Unit) { val wc=getUserWordsCollection();if(wc==null){callback(emptyList());return};wc.get().addOnSuccessListener{res->callback(res.documents.mapNotNull{it.toObject(Word::class.java)})}.addOnFailureListener{e->Log.e("FR","Err getAll",e);callback(emptyList())}}
+    fun getWordObject(text: String, callback: (Word?) -> Unit) {
+        val userWordsCollection = getUserWordsCollection()
+        if (userWordsCollection == null) {
+            Log.w(TAG, "User words collection is null. Cannot get word object.")
+            callback(null)
+            return
+        }
+
+        userWordsCollection.whereEqualTo("text", text)
+            .limit(1)
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                val word = querySnapshot.documents.firstOrNull()?.toObject(Word::class.java)
+                callback(word)
+            }
+            .addOnFailureListener { exception ->
+                Log.e(TAG, "Error getting word object by text: $text", exception)
+                callback(null)
+            }
+    }
+
+    /**
+     * Deletes a Word document from Firestore by its ID.
+     *
+     * @param wordId The ID of the word document to delete.
+     * @param callback A callback function to indicate success (true) or failure (false).
+     */
+    fun deleteWord(wordId: String, callback: (Boolean) -> Unit) {
+        val userWordsCollection = getUserWordsCollection()
+        if (userWordsCollection == null) {
+            Log.w(TAG, "User words collection is null. Cannot delete word.")
+            callback(false)
+            return
+        }
+
+        if (wordId.isBlank()) {
+            Log.w(TAG, "Word ID is blank. Cannot delete word.")
+            callback(false)
+            return
+        }
+
+        userWordsCollection.document(wordId)
+            .delete()
+            .addOnSuccessListener {
+                Log.d(TAG, "Word deleted successfully with ID: $wordId")
+                callback(true)
+            }
+            .addOnFailureListener { exception ->
+                Log.e(TAG, "Error deleting word with ID: $wordId", exception)
+                callback(false)
+            }
+    }
+
+    /**
+     * Retrieves a Word object from Firestore by its document ID.
+     *
+     * @param wordId The ID of the word document.
+     * @param callback A callback function to receive the Word object or null if not found or an error occurs.
+     */
+    fun getWordById(wordId: String, callback: (Word?) -> Unit) {
+        val userWordsCollection = getUserWordsCollection()
+        if (userWordsCollection == null) {
+            Log.w(TAG, "User words collection is null. Cannot get word by ID.")
+            callback(null)
+            return
+        }
+
+        userWordsCollection.document(wordId)
+            .get()
+            .addOnSuccessListener { documentSnapshot ->
+                val word = documentSnapshot.toObject(Word::class.java)
+                callback(word)
+            }
+            .addOnFailureListener { exception ->
+                Log.e(TAG, "Error getting word by ID: $wordId", exception)
+                callback(null)
+            }
+    }
+
+    /**
+     * Retrieves a Word object from Firestore by its document ID using Kotlin Coroutines.
+     *
+     * @param wordId The ID of the word document.
+     * @return The Word object or null if not found or an error occurs.
+     */
+    suspend fun getWordById_Suspend(wordId: String): Word? {
+        val userWordsCollection = getUserWordsCollection()
+        if (userWordsCollection == null) {
+            Log.w(TAG, "User words collection is null. Cannot get word by ID (suspend).")
+            return null
+        }
+
+        return try {
+            val documentSnapshot = userWordsCollection.document(wordId).get().await()
+            documentSnapshot.toObject(Word::class.java)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting word by ID (suspend): $wordId", e)
+            null
+        }
+    }
+
+    /**
+     * Sets up a real-time listener for changes to the user's words collection.
+     *
+     * @param callback A callback function to receive the list of Word objects whenever the data changes.
+     * @return A ListenerRegistration object that can be used to remove the listener.
+     */
+    fun getWordsListener(callback: (List<Word>) -> Unit): ListenerRegistration? {
+        val userWordsCollection = getUserWordsCollection()
+        if (userWordsCollection == null) {
+            Log.w(TAG, "User words collection is null. Cannot set up words listener.")
+            callback(emptyList())
+            return null
+        }
+
+        return userWordsCollection.addSnapshotListener { querySnapshot, exception ->
+            if (exception != null) {
+                Log.e(TAG, "Error listening for words changes", exception)
+                callback(emptyList())
+                return@addSnapshotListener
+            }
+
+            val words = querySnapshot?.toObjects(Word::class.java) ?: emptyList()
+            callback(words)
+        }
+    }
 
 
     // --- Методи для груп (Groups) ---
@@ -350,30 +607,34 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
     // ... (скопіюй їх сюди)
     fun getGroups(callback: (List<Group>) -> Unit): ListenerRegistration? { val gc=getUserGroupsCollection();if(gc==null){callback(emptyList());return null};return gc.addSnapshotListener{snap,e->if(e!=null){Log.e("FR","Err groupsListen",e);callback(emptyList());return@addSnapshotListener};callback(snap?.toObjects(Group::class.java)?:emptyList())}}
     suspend fun deleteGroup(groupId: String): Boolean {
-        val wc=getUserWordsCollection();
-        val gc=getUserGroupsCollection();
+        val wc=getUserWordsCollection()
+        val gc=getUserGroupsCollection()
         if(wc==null||gc==null||groupId.isBlank()){
             return false
-        };
+        }
         return try{
-            val batch=db.batch();
-            val wordsInGrp=wc.whereEqualTo("dictionaryId",groupId).get().await();
-            for(doc in wordsInGrp.documents){batch.update(wc.document(doc.id),"dictionaryId",null)};
-            batch.delete(gc.document(groupId));
-            batch.commit().await();
+            val batch=db.batch()
+            val wordsInGrp=wc.whereEqualTo("dictionaryId",groupId).get().await()
+            for(doc in wordsInGrp.documents){batch.update(wc.document(doc.id),"dictionaryId",null)}
+            batch.delete(gc.document(groupId))
+            batch.commit().await()
             true
         }catch(e:Exception){
-            Log.e("FR","Err delGrp",e);false}
+            Log.e("FR","Err delGrp",e)
+            false}
     }
     suspend fun createGroup(name: String): Boolean {
-        val gc=getUserGroupsCollection();
+        val gc=getUserGroupsCollection()
         if(gc==null||name.isBlank()){
             return false
-        };return try
-        {val grpId=gc.document().id;gc.document(grpId).set(Group(id=grpId,name=name)).await();
+        }
+        return try
+        {val grpId=gc.document().id
+            gc.document(grpId).set(Group(id=grpId,name=name)).await()
             true
-        }catch(e:Exception){Log.e("FR","Err createGrp",e);
-            false}
+        }catch(e:Exception){Log.e("FR","Err createGrp",e)
+            false
+        }
     }
     suspend fun updateGroup(groupId: String, newName: String): Boolean { val gc=getUserGroupsCollection();if(gc==null||groupId.isBlank()||newName.isBlank()){return false};return try{gc.document(groupId).update("name",newName).await();true}catch(e:Exception){Log.e("FR","Err updateGrp",e);false}}
 }

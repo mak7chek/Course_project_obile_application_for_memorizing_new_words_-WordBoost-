@@ -197,8 +197,8 @@ class BrowseSharedSetViewModel(
             if (addToVocabulary) {
                 val newPersonalWord = Word(
                     id = UUID.randomUUID().toString(),
-                    text = sharedWordItem.originalText,
-                    translation = sharedWordItem.translationText,
+                    text = sharedWordItem.translationText,
+                    translation = sharedWordItem.originalText,
                     repetition = 0, easiness = 2.5f, interval = 0L, lastReviewed = 0L,
                     nextReview = System.currentTimeMillis(), status = "new"
                 )

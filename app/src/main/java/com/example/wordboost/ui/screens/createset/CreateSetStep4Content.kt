@@ -14,24 +14,31 @@ fun CreateSetStep4Content(
     viewModel: CreateSetViewModel,
     setNameUkDisplay: String,
     onCloseFlow: () -> Unit,
+    isEditing: Boolean, // <--- Приймаємо прапорець
     modifier: Modifier = Modifier
 ) {
-    val isSetPublic by viewModel.isSetPublic
+    val isSetPublic by viewModel.isSetPublic // Використовуємо isSetPublic з ViewModel для поля 'public'
     val isLoadingSaveSet by viewModel.isLoading
     val currentOperationMessage by viewModel.operationMessage
-    val isSuccessfullyCreated = currentOperationMessage?.contains("успішно створено", ignoreCase = true) == true
 
+    val successMessagePattern = if (isEditing) "успішно оновлено" else "успішно створено"
+    val isSuccessfullySaved = currentOperationMessage?.contains(successMessagePattern, ignoreCase = true) == true
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier = modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        if (isSuccessfullyCreated) {
-            Text("Набір '$setNameUkDisplay' успішно створено!", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+        if (isSuccessfullySaved) {
+            Text(
+                if(isEditing) "Набір '$setNameUkDisplay' успішно оновлено!" else "Набір '$setNameUkDisplay' успішно створено!",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
         } else {
-            Text("Налаштуйте видимість для набору '$setNameUkDisplay' та збережіть його.", style = MaterialTheme.typography.titleLarge)
+            Text(
+                if(isEditing) "Завершіть редагування набору '$setNameUkDisplay'" else "Налаштуйте видимість для набору '$setNameUkDisplay' та збережіть його.",
+                style = MaterialTheme.typography.titleLarge
+            )
             Spacer(modifier = Modifier.height(16.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -41,7 +48,7 @@ fun CreateSetStep4Content(
                 Switch(
                     checked = isSetPublic,
                     onCheckedChange = { viewModel.onVisibilityChanged(it) },
-                    enabled = !isLoadingSaveSet && !isSuccessfullyCreated // Блокуємо, якщо вже збережено
+                    enabled = !isLoadingSaveSet && !isSuccessfullySaved // Блокуємо, якщо вже збережено
                 )
             }
             Text(
@@ -53,20 +60,23 @@ fun CreateSetStep4Content(
         }
 
         Spacer(modifier = Modifier.weight(1f))
-
-        if (isSuccessfullyCreated) {
-            Button(
-                onClick = { viewModel.resetAllState() },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Створити ще один набір")
+        if (isSuccessfullySaved) {
+            if (!isEditing) { // Показуємо "Створити ще" тільки якщо це було створення
+                Button(
+                    onClick = {
+                        viewModel.resetAllState() // Це також скине editingSetId
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Створити ще один набір")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
             }
-            Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(
                 onClick = onCloseFlow,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Завершити")
+                Text(if (isEditing) "Повернутися до списку" else "Завершити")
             }
         } else {
             Button(
@@ -74,7 +84,7 @@ fun CreateSetStep4Content(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isLoadingSaveSet
             ) {
-                Text("Зберегти набір карток")
+                Text(if (isEditing) "Оновити набір" else "Зберегти набір карток")
             }
         }
     }

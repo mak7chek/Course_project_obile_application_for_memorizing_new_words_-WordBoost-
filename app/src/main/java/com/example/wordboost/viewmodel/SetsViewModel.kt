@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.mutableStateOf
 
 class SetsViewModel(
     private val firebaseRepository: FirebaseRepository,
@@ -30,11 +31,28 @@ class SetsViewModel(
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+    private val _showDeleteConfirmDialog = MutableStateFlow(false)
+    val showDeleteConfirmDialog: StateFlow<Boolean> = _showDeleteConfirmDialog.asStateFlow()
+    private val _isMySetsExpanded = MutableStateFlow(true) // За замовчуванням розгорнуто
+    val isMySetsExpanded: StateFlow<Boolean> = _isMySetsExpanded.asStateFlow()
 
+    private val _isPublicSetsExpanded = MutableStateFlow(true) // За замовчуванням розгорнуто
+    val isPublicSetsExpanded: StateFlow<Boolean> = _isPublicSetsExpanded.asStateFlow()
+
+    private var setToDeleteId: String? = null
+    private var setToDeleteName: String? = null
     init {
         loadAllSets()
     }
+    fun toggleMySetsExpanded() {
+        _isMySetsExpanded.value = !_isMySetsExpanded.value
+        Log.d("SetsVM", "My Sets expanded state: ${_isMySetsExpanded.value}")
+    }
 
+    fun togglePublicSetsExpanded() {
+        _isPublicSetsExpanded.value = !_isPublicSetsExpanded.value
+        Log.d("SetsVM", "Public Sets expanded state: ${_isPublicSetsExpanded.value}")
+    }
     fun loadAllSets() {
         loadMySets()
         loadPublicSets()
@@ -78,6 +96,50 @@ class SetsViewModel(
             _isLoadingPublicSets.value = false
         }
     }
+    fun requestDeleteSet(setId: String, setName: String) {
+        setToDeleteId = setId
+        setToDeleteName = setName
+        _showDeleteConfirmDialog.value = true
+        _errorMessage.value = null
+    }
+
+    fun confirmDeleteSet() {
+        val currentSetId = setToDeleteId
+        if (currentSetId == null) {
+            _errorMessage.value = "Помилка: ID набору для видалення не вказано."
+            _showDeleteConfirmDialog.value = false
+            return
+        }
+
+        _isLoadingMySets.value = true
+        _showDeleteConfirmDialog.value = false
+
+        viewModelScope.launch {
+            val result = firebaseRepository.deleteSharedCardSet(currentSetId)
+            result.fold(
+                onSuccess = {
+                    _errorMessage.value = "Набір '${setToDeleteName ?: currentSetId}' успішно видалено."
+                    Log.i("SetsVM", "Set $currentSetId deleted successfully.")
+                    loadMySets()
+                },
+                onFailure = { exception ->
+                    _errorMessage.value = "Помилка видалення набору: ${exception.message}"
+                    Log.e("SetsVM", "Error deleting set $currentSetId", exception)
+                }
+            )
+            _isLoadingMySets.value = false
+            setToDeleteId = null // Скидаємо
+            setToDeleteName = null
+        }
+    }
+
+    fun cancelDeleteSet() {
+        _showDeleteConfirmDialog.value = false
+        setToDeleteId = null
+        setToDeleteName = null
+    }
+    fun getSetNameToDelete(): String? = setToDeleteName
+
     fun clearErrorMessage() {
         _errorMessage.value = null
     }

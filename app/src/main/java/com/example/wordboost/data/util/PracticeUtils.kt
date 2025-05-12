@@ -85,16 +85,14 @@ object PracticeUtils {
         // Приклад: мапимо перші кроки навчання (rep 0, 1, 2) та перший довгий інтервал (1 день)
         // до певного прогресу, а далі - зростання інтервалу.
         val progress: Float = when {
-            repetition == 0 && interval <= ONE_MINUTE_MS -> 0.1f // Після помилки або нове
-            repetition == 1 && interval <= ONE_MINUTE_MS -> 0.2f // Перший успіх (1 хв)
-            repetition == 2 && interval <= SIX_MINUTES_MS -> 0.4f // Другий успіх (6 хв)
+            repetition == 0 && interval <= ONE_MINUTE_MS -> 0.1f 
+            repetition == 1 && interval <= ONE_MINUTE_MS -> 0.2f
+            repetition == 2 && interval <= SIX_MINUTES_MS -> 0.4f
             repetition > 2 && interval <= ONE_DAY_MS -> 0.6f // Перехід на 1 день
             repetition > 2 && interval > ONE_DAY_MS && interval <= TimeUnit.DAYS.toMillis(7) -> 0.7f // До тижня
             repetition > 2 && interval > TimeUnit.DAYS.toMillis(7) && interval <= TimeUnit.DAYS.toMillis(30) -> 0.85f // До місяця
-            else -> 1.0f // Довгі інтервали, майже опановано
+            else -> 1.0f
         }
-        // Можна також враховувати oldEF, але це ускладнить.
-        // minOf використовуємо, щоб не перевищити 1.0f, хоча при цій логіці це малоймовірно.
         return minOf(progress, 1.0f)
     }
 }

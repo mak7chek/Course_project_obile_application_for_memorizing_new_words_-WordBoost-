@@ -16,37 +16,28 @@ import kotlinx.coroutines.launch
 @Composable
 fun CreateSetScreen(
     viewModel: CreateSetViewModel,
+    isEditing: Boolean, // <--- Приймаємо прапорець
     onCloseOrNavigateBack: () -> Unit
 ) {
     val currentStep by viewModel.currentStep
     val isLoading by viewModel.isLoading
     val operationMessage by viewModel.operationMessage
+    // Використовуємо isEditingMode з ViewModel, щоб UI реагував на завантаження даних для редагування
+    val actualIsEditing = viewModel.isEditingMode // viewModel.isEditingMode стає true після успішного loadSetForEditing
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
-    LaunchedEffect(operationMessage) {
-        operationMessage?.let { message ->
-            coroutineScope.launch {
-                snackbarHostState.showSnackbar(
-                    message = message,
-                    duration = SnackbarDuration.Short
-                )
-                viewModel.operationMessage.value = null // Очищаємо повідомлення після показу
-            }
-        }
-    }
+    val successMessagePattern = if (actualIsEditing) "успішно оновлено" else "успішно створено"
+    val isSuccessfullySaved = operationMessage?.contains(successMessagePattern, ignoreCase = true) == true
 
-    val isSuccessfullyCreated = operationMessage?.contains("успішно створено", ignoreCase = true) == true
+    LaunchedEffect(operationMessage) { /* ... (без змін) ... */ }
 
     BackHandler(enabled = true) {
-        if (currentStep > 1 && !isSuccessfullyCreated) {
-            // Дозволяємо крок назад, тільки якщо набір ще не створено успішно
-            // або якщо ми не на першому кроці.
+        if (currentStep > 1 && !isSuccessfullySaved) {
             viewModel.goBackStep()
         } else {
-            // Якщо набір успішно створено, або ми на першому кроці, системна кнопка "назад" закриває екран
-            onCloseOrNavigateBack()
+            onCloseOrNavigateBack() // Викличе resetAllState у ViewModel та скине editingSetId у MainScreen
         }
     }
 
@@ -56,22 +47,31 @@ fun CreateSetScreen(
             TopAppBar(
                 title = {
                     Text(
-                        when (currentStep) {
-                            1 -> "Крок 1: Назва набору"
-                            2 -> "Крок 2: Деталі"
-                            3 -> "Крок 3: Додавання слів"
-                            4 -> if(isSuccessfullyCreated) "Набір Створено" else "Крок 4: Завершення"
-                            else -> "Створення набору"
+                        if (actualIsEditing) { // Динамічний заголовок
+                            when (currentStep) {
+                                1 -> "Редагування: Назва"
+                                2 -> "Редагування: Деталі"
+                                3 -> "Редагування: Слова"
+                                4 -> if (isSuccessfullySaved) "Набір Оновлено" else "Редагування: Завершення"
+                                else -> "Редагування набору"
+                            }
+                        } else { // Заголовки для створення
+                            when (currentStep) {
+                                1 -> "Крок 1: Назва набору"
+                                2 -> "Крок 2: Деталі"
+                                3 -> "Крок 3: Додавання слів"
+                                4 -> if (isSuccessfullySaved) "Набір Створено" else "Крок 4: Завершення"
+                                else -> "Створення набору"
+                            }
                         }
                     )
                 },
                 navigationIcon = {
-                    // Показуємо "Назад" якщо можна повернутися на попередній крок І набір ще не створений
-                    if (currentStep > 1 && !isSuccessfullyCreated) {
+                    if (currentStep > 1 && !isSuccessfullySaved) {
                         IconButton(onClick = { viewModel.goBackStep() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                         }
-                    } else { // В іншому випадку (перший крок АБО набір вже створений) показуємо "Закрити"
+                    } else {
                         IconButton(onClick = onCloseOrNavigateBack) {
                             Icon(Icons.Filled.Close, contentDescription = "Закрити")
                         }
@@ -85,21 +85,20 @@ fun CreateSetScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            Column(modifier = Modifier.fillMaxSize()) { // Modifier.weight(1f) для вмісту кроку
+            Column(modifier = Modifier.fillMaxSize()) {
                 when (currentStep) {
                     1 -> CreateSetStep1Content(viewModel, Modifier.weight(1f))
                     2 -> CreateSetStep2Content(viewModel, Modifier.weight(1f))
                     3 -> CreateSetStep3Content(viewModel, Modifier.weight(1f))
                     4 -> CreateSetStep4Content(
                         viewModel = viewModel,
-                        setNameUkDisplay = viewModel.setNameUk.value, // Передаємо актуальну назву
+                        setNameUkDisplay = viewModel.setNameUk.value, // Використовуємо state з ViewModel
                         onCloseFlow = onCloseOrNavigateBack,
+                        isEditing = actualIsEditing, // <--- Передаємо actualIsEditing
                         modifier = Modifier.weight(1f)
                     )
-                    // Можна додати окремий крок/стан для "Успішно створено", якщо потрібно
                 }
             }
-
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
