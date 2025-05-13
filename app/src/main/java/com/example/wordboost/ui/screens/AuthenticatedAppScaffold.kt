@@ -271,7 +271,7 @@ fun AuthenticatedAppScaffold(
     onNavigateToCreateSet: () -> Unit,
     onLogoutClick: () -> Unit,
     onNavigateToBrowseSet: (String) -> Unit,
-    onNavigateToEditSet: (String) -> Unit, // Додано новий параметр
+    onNavigateToEditSet: (String) -> Unit,
     setsViewModelFactory: SetsViewModelFactory,
     wordListViewModelFactory: WordListViewModelFactory
 ) {

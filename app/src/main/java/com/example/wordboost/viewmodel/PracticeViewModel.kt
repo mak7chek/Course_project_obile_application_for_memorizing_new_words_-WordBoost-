@@ -12,9 +12,7 @@ import com.example.wordboost.data.util.Stack
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlin.random.Random
-
-
-
+import androidx.annotation.VisibleForTesting
 
 enum class PromptContentType { Original, Translation }
 enum class CardState { Prompt, Answer }
@@ -43,6 +41,10 @@ class PracticeViewModel(
     private val ttsService: TextToSpeechService,
     private val authRepository: AuthRepository
 ) : ViewModel() {
+    @VisibleForTesting
+    internal fun forceSetPhaseForTesting(phase: PracticePhase) {
+        _practicePhase.value = phase
+    }
 
     private val _allWordsForSession = MutableStateFlow<List<Word>>(emptyList())
     private val _currentBatch = MutableStateFlow<List<Word>>(emptyList())
@@ -70,6 +72,8 @@ class PracticeViewModel(
     private val undoStack = Stack<UndoState>()
     private val _canUndo = MutableStateFlow(false)
     val canUndo: StateFlow<Boolean> = _canUndo.asStateFlow()
+    internal val allWordsForSessionSnapshotForDebug: List<Word>
+        get() = _allWordsForSession.value
 
     init {
         Log.i("PracticeVM_Lifecycle", "ViewModel initialized (init block). Will call startOrRefreshSession via UI.")
@@ -226,7 +230,10 @@ class PracticeViewModel(
     }
 
     private fun createWordMemento(word: Word): WordMemento { return WordMemento(word.id,word.repetition,word.easiness,word.interval,word.lastReviewed,word.nextReview,word.status) }
-    private fun restoreWordFromMemento(word: Word, memento: WordMemento): Word { return word.copy(repetition=memento.repetition,easiness=memento.easiness,interval=memento.interval,lastReviewed=memento.lastReviewed,nextReview=memento.nextReview,status=memento.status) }
+    private fun restoreWordFromMemento(word: Word, memento: WordMemento): Word
+    {
+        return word.copy(repetition=memento.repetition,easiness=memento.easiness,interval=memento.interval,lastReviewed=memento.lastReviewed,nextReview=memento.nextReview,status=memento.status)
+    }
 
     private fun processAnswerAndUpdateWord(word: Word, quality: Int) {
         Log.i("PracticeVM_Process", "Processing answer for '${word.text}', quality $quality. Current index: ${_currentWordIndexInBatch.value}, batch size: ${_currentBatch.value.size}")

@@ -80,7 +80,6 @@ class TranslationRepository(
 
 
     suspend fun translateForSetCreationSuspend(text: String, targetLang: String): String? {
-        // 1. Перевірка в кеші (Room) - виконуємо в IO контексті
         val cachedResult = withContext(Dispatchers.IO) {
             val cachedEntry: CacheEntity? = cacheDao.getCacheEntry(text)
             if (cachedEntry != null) {
@@ -112,13 +111,12 @@ class TranslationRepository(
         return suspendCancellableCoroutine { continuation ->
             realTranslator.translate(text, targetLang) { deeplResult ->
                 if (deeplResult != null) {
-                    // !!! НОВА ПЕРЕВІРКА ПЕРЕД ЗБЕРЕЖЕННЯМ В КЕШ !!!
                     if (!text.equals(deeplResult, ignoreCase = true)) {
                         CoroutineScope(Dispatchers.IO).launch {
                             cacheDao.insertTranslation(
                                 text.trim(),
                                 deeplResult.trim()
-                            ) // Зберігаємо очищені значення
+                            )
                             Log.d(
                                 "TranslationRepo",
                                 "[TFSC_Suspend] Результат DeepL '$deeplResult' вставлено в кеш для '$text'"

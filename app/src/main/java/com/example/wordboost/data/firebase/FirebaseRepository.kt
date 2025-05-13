@@ -22,10 +22,6 @@ import com.google.firebase.firestore.QuerySnapshot
 class FirebaseRepository(private val authRepository: AuthRepository) {
     private val db = Firebase.firestore
     private val TAG: String = "FirestoreHelper"
-    private fun getUserWordsCollectionPath(): String? {
-        val userId = authRepository.getCurrentUser()?.uid
-        return if (userId != null) "users/$userId/words" else null
-    }
     private fun getUserWordsCollection() = authRepository.getCurrentUser()?.uid?.let { userId ->
         Log.i("FirebaseRepo_User", "getUserWordsCollection: Accessing words for userId: $userId")
         db.collection("users").document(userId).collection("words")
@@ -600,11 +596,6 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
             callback(words)
         }
     }
-
-
-    // --- Методи для груп (Groups) ---
-    // getGroups, deleteGroup, createGroup, updateGroup - без змін від твого коду
-    // ... (скопіюй їх сюди)
     fun getGroups(callback: (List<Group>) -> Unit): ListenerRegistration? { val gc=getUserGroupsCollection();if(gc==null){callback(emptyList());return null};return gc.addSnapshotListener{snap,e->if(e!=null){Log.e("FR","Err groupsListen",e);callback(emptyList());return@addSnapshotListener};callback(snap?.toObjects(Group::class.java)?:emptyList())}}
     suspend fun deleteGroup(groupId: String): Boolean {
         val wc=getUserWordsCollection()

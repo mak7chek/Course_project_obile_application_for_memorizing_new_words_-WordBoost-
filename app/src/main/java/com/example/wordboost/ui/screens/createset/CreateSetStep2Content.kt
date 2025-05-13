@@ -7,7 +7,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.wordboost.data.model.DifficultyLevel // Імпорт моделі
+import com.example.wordboost.data.model.DifficultyLevel
 import com.example.wordboost.viewmodel.CreateSetViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)

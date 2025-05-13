@@ -95,10 +95,8 @@ class AuthRepository {
                 if (task.isSuccessful) {
                     val user = auth.currentUser
                     if (user != null) {
-                        // !!! КЛЮЧОВА ЗМІНА: ПЕРЕЗАВАНТАЖЕННЯ ДАНИХ КОРИСТУВАЧА !!!
                         user.reload().addOnCompleteListener { reloadTask ->
                             if (reloadTask.isSuccessful) {
-                                // Тепер user.isEmailVerified має бути актуальним
                                 if (user.isEmailVerified) {
                                     Log.d("AuthRepository", "User ${user.email} logged in and email IS VERIFIED.")
                                     onResult(true, "Успішний вхід.")
@@ -107,7 +105,6 @@ class AuthRepository {
                                     onResult(false, "Будь ласка, підтвердьте вашу email адресу перед входом.")
                                 }
                             } else {
-                                // Помилка перезавантаження даних користувача
                                 Log.w("AuthRepository", "Failed to reload user data after login: ${reloadTask.exception?.message}")
                                 onResult(false, "Помилка входу: не вдалося перевірити статус верифікації email.")
                             }

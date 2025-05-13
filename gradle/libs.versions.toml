@@ -12,12 +12,18 @@ firebaseCommonKtx = "21.0.0"
 firebaseFirestoreKtx = "25.1.3"
 roomCommonJvm = "2.7.0"
 media3CommonKtx = "1.6.1"
+androidxJUnit = "1.1.5"
+androidxEspressoCore = "3.5.1"
+androidxComposeUiTooling = "1.6.7" # Або версія з твого BOM
+androidxComposeUiTestManifest = "1.6.7" # Або версія з твого BOM
 
 [libraries]
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJUnit" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "androidxEspressoCore" }
+androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling", version.ref = "androidxComposeUiTooling" }
+androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest", version.ref = "androidxComposeUiTestManifest" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
-androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
-androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }

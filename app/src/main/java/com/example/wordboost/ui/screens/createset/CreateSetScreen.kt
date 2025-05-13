@@ -37,7 +37,7 @@ fun CreateSetScreen(
         if (currentStep > 1 && !isSuccessfullySaved) {
             viewModel.goBackStep()
         } else {
-            onCloseOrNavigateBack() // Викличе resetAllState у ViewModel та скине editingSetId у MainScreen
+            onCloseOrNavigateBack()
         }
     }
 

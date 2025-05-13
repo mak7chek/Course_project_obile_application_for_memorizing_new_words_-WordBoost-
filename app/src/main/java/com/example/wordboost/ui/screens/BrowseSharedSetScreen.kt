@@ -1,5 +1,6 @@
 package com.example.wordboost.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -37,7 +38,9 @@ fun BrowseSharedSetScreen(
     } else {
         0f
     }
-
+    BackHandler(enabled = true) {
+        onBack()
+    }
 
     Scaffold(
         topBar = {

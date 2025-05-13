@@ -4,7 +4,6 @@ import android.util.Log
 import com.example.wordboost.data.firebase.FirebaseRepository
 import com.example.wordboost.data.model.Word
 import com.example.wordboost.data.util.PracticeUtils
-// !!! Import Flow !!!
 import kotlinx.coroutines.flow.Flow
 
 class PracticeRepository(private val firebase: FirebaseRepository) {
@@ -21,7 +20,7 @@ class PracticeRepository(private val firebase: FirebaseRepository) {
     fun updateWordAfterPractice(
         word: Word,
         quality: Int,
-        callback: (Boolean) -> Unit // <--- ПЕРЕКОНАЙСЯ, ЩО ТУТ (Boolean) -> Unit
+        callback: (Boolean) -> Unit
     ) {
         val (rep, ef, interval) = PracticeUtils.sm2(
             word.repetition, word.easiness, word.interval, quality
@@ -68,10 +67,9 @@ class PracticeRepository(private val firebase: FirebaseRepository) {
             easiness = 2.5f,
             interval = 0L,
             lastReviewed = 0L,
-            nextReview = 0L, // Або System.currentTimeMillis(), якщо воно має бути готове до перегляду одразу
+            nextReview = 0L,
             status = "new"
         )
-        // Викликаємо оновлений saveWord
         saveWord(reset) { success ->
             if (success) {
                 Log.d("PracticeRepo", "Word ${reset.id} progress reset successfully.")
