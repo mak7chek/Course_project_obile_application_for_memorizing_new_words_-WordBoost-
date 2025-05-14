@@ -58,7 +58,7 @@ class MainActivity : ComponentActivity() {
         ttsService = TextToSpeechService(applicationContext)
 
         setContent {
-            Course_project_obile_application_for_memorizing_new_words_WordBoostTheme { // Ваша тема
+            Course_project_obile_application_for_memorizing_new_words_WordBoostTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     MainScreen(
                         authRepo = authRepo,

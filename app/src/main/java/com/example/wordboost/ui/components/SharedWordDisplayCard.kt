@@ -1,6 +1,5 @@
 package com.example.wordboost.ui.components
 
-import android.util.Log
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -34,7 +33,7 @@ import com.example.wordboost.data.model.SharedSetWordItem
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-fun Offset.toIntOffset() = IntOffset(x.roundToInt(), y.roundToInt()) // Краще використовувати roundToInt
+fun Offset.toIntOffset() = IntOffset(x.roundToInt(), y.roundToInt())
 @Composable
 fun SharedWordDisplayCard(
     wordItem: SharedSetWordItem,
@@ -49,37 +48,30 @@ fun SharedWordDisplayCard(
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
-    val swipeThresholdPx = screenHeightPx / 4.5f // Поріг свайпу - чверть висоти екрану
+    val swipeThresholdPx = screenHeightPx / 4.5f
 
     Card(
         modifier = modifier
             .fillMaxWidth(0.85f)
             .aspectRatio(1.6f)
-            // !!! ВИПРАВЛЕНО MODIFIER.OFFSET !!!
             .offset { IntOffset(x = 0, y = offsetY.roundToInt()) }
             .pointerInput(wordItem.id) {
                 detectVerticalDragGestures(
                     onDragStart = {
-                        offsetY = 0f // Скидаємо для нового жесту на цій картці
+                        offsetY = 0f
                         dragProgress.value = 0f
-                        Log.d("SharedWordDisplayCard", "onDragStart, offsetY reset to 0")
                     },
                     onDragEnd = {
                         val currentOffsetY = offsetY
-                        Log.d("SharedWordDisplayCard", "onDragEnd, currentOffsetY: $currentOffsetY, threshold: $swipeThresholdPx")
                         val swipedUp = currentOffsetY < -swipeThresholdPx
                         val swipedDown = currentOffsetY > swipeThresholdPx
 
                         if (swipedUp) {
-                            Log.d("SharedWordDisplayCard", "Swipe UP detected")
                             onSwipeUp()
                         } else if (swipedDown) {
-                            Log.d("SharedWordDisplayCard", "Swipe DOWN detected")
                             onSwipeDown()
                         } else {
-                            // Свайп недостатньо сильний, повертаємо картку плавно (або миттєво)
-                            Log.d("SharedWordDisplayCard", "Swipe not strong enough, snapping back.")
-                            offsetY = 0f // Миттєве повернення
+                            offsetY = 0f
                             dragProgress.value = 0f
                         }
                     },
@@ -95,7 +87,6 @@ fun SharedWordDisplayCard(
                 rotationZ = dragProgress.value * 10f
             ),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-        // Переконайся, що MaterialTheme.shapes.large існує і правильно визначений
         shape = MaterialTheme.shapes.large
     ) {
         Box(
@@ -111,7 +102,7 @@ fun SharedWordDisplayCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = wordItem.originalText,
-                        style = MaterialTheme.typography.displaySmall.copy(fontSize = 26.sp), // Тепер sp має працювати
+                        style = MaterialTheme.typography.displaySmall.copy(fontSize = 26.sp),
                         textAlign = TextAlign.Center,
                         maxLines = 3
                     )
@@ -127,7 +118,7 @@ fun SharedWordDisplayCard(
                 )
                 Text(
                     text = if (showTranslation || wordItem.translationText.isBlank()) wordItem.translationText else "...",
-                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = 22.sp), // Тепер sp має працювати
+                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = 22.sp),
                     color = if (showTranslation) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     modifier = Modifier.alpha(translationAlpha),

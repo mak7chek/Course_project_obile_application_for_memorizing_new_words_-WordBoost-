@@ -45,7 +45,7 @@ fun BrowseSharedSetScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-               title = { Text(setDetailsWithWords?.setInfo?.name_uk ?: "Завантаження...") },
+                title = { Text(setDetailsWithWords?.setInfo?.name_uk ?: "Завантаження...") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад")
@@ -60,7 +60,7 @@ fun BrowseSharedSetScreen(
                 .fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            if (isLoading && currentDisplayWord == null && !isSetCompleted) { // Початкове завантаження
+            if (isLoading && currentDisplayWord == null && !isSetCompleted) {
                 CircularProgressIndicator()
             } else if (isSetCompleted || (currentDisplayWord == null && !isLoading && setDetailsWithWords != null)) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -93,7 +93,6 @@ fun BrowseSharedSetScreen(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
                         )
                         Text(
-                            // +1 до currentIndexDisplay для відображення 1-based індексації
                             "Слово ${currentIndexDisplay + 1} з $totalWords",
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.padding(bottom = 8.dp)
@@ -119,7 +118,7 @@ fun BrowseSharedSetScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(16.dp)
                     )
-                    Spacer(modifier = Modifier.height(16.dp)) // Невеликий відступ знизу
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             } else {
                 Text("Немає слів для відображення або сталася помилка.", style = MaterialTheme.typography.bodyLarge)
@@ -127,4 +126,3 @@ fun BrowseSharedSetScreen(
         }
     }
 }
-

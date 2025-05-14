@@ -61,10 +61,10 @@ fun CreateSetStep4Content(
 
         Spacer(modifier = Modifier.weight(1f))
         if (isSuccessfullySaved) {
-            if (!isEditing) { // Показуємо "Створити ще" тільки якщо це було створення
+            if (!isEditing) {
                 Button(
                     onClick = {
-                        viewModel.resetAllState() // Це також скине editingSetId
+                        viewModel.resetAllState()
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {

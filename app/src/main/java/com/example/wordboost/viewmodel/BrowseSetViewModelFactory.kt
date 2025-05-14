@@ -1,4 +1,3 @@
-// com.example.wordboost.viewmodel.BrowseSetViewModelFactory.kt (новий файл)
 package com.example.wordboost.viewmodel
 
 import androidx.lifecycle.ViewModel
@@ -6,7 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.example.wordboost.data.firebase.AuthRepository
 import com.example.wordboost.data.firebase.FirebaseRepository
 import com.example.wordboost.data.tts.TextToSpeechService
-import com.example.wordboost.viewmodel.BrowseSharedSetViewModel // Переконайся, що шлях правильний
+import com.example.wordboost.viewmodel.BrowseSharedSetViewModel
 
 @Suppress("UNCHECKED_CAST")
 class BrowseSetViewModelFactory(

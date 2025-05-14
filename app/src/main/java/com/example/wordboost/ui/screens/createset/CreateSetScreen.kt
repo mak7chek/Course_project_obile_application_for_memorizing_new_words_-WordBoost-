@@ -16,14 +16,13 @@ import kotlinx.coroutines.launch
 @Composable
 fun CreateSetScreen(
     viewModel: CreateSetViewModel,
-    isEditing: Boolean, // <--- Приймаємо прапорець
+    isEditing: Boolean,
     onCloseOrNavigateBack: () -> Unit
 ) {
     val currentStep by viewModel.currentStep
     val isLoading by viewModel.isLoading
     val operationMessage by viewModel.operationMessage
-    // Використовуємо isEditingMode з ViewModel, щоб UI реагував на завантаження даних для редагування
-    val actualIsEditing = viewModel.isEditingMode // viewModel.isEditingMode стає true після успішного loadSetForEditing
+    val actualIsEditing = viewModel.isEditingMode
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -31,7 +30,7 @@ fun CreateSetScreen(
     val successMessagePattern = if (actualIsEditing) "успішно оновлено" else "успішно створено"
     val isSuccessfullySaved = operationMessage?.contains(successMessagePattern, ignoreCase = true) == true
 
-    LaunchedEffect(operationMessage) { /* ... (без змін) ... */ }
+    LaunchedEffect(operationMessage) { }
 
     BackHandler(enabled = true) {
         if (currentStep > 1 && !isSuccessfullySaved) {
@@ -47,7 +46,7 @@ fun CreateSetScreen(
             TopAppBar(
                 title = {
                     Text(
-                        if (actualIsEditing) { // Динамічний заголовок
+                        if (actualIsEditing) {
                             when (currentStep) {
                                 1 -> "Редагування: Назва"
                                 2 -> "Редагування: Деталі"
@@ -55,7 +54,7 @@ fun CreateSetScreen(
                                 4 -> if (isSuccessfullySaved) "Набір Оновлено" else "Редагування: Завершення"
                                 else -> "Редагування набору"
                             }
-                        } else { // Заголовки для створення
+                        } else {
                             when (currentStep) {
                                 1 -> "Крок 1: Назва набору"
                                 2 -> "Крок 2: Деталі"
@@ -92,9 +91,9 @@ fun CreateSetScreen(
                     3 -> CreateSetStep3Content(viewModel, Modifier.weight(1f))
                     4 -> CreateSetStep4Content(
                         viewModel = viewModel,
-                        setNameUkDisplay = viewModel.setNameUk.value, // Використовуємо state з ViewModel
+                        setNameUkDisplay = viewModel.setNameUk.value,
                         onCloseFlow = onCloseOrNavigateBack,
-                        isEditing = actualIsEditing, // <--- Передаємо actualIsEditing
+                        isEditing = actualIsEditing,
                         modifier = Modifier.weight(1f)
                     )
                 }

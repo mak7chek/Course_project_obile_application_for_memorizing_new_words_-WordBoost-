@@ -31,7 +31,7 @@ class TranslateViewModel(
 
     private val _groups = MutableStateFlow<List<Group>>(emptyList())
     val editableGroups: StateFlow<List<Group>> = _groups.map { allGroups ->
-        allGroups.filter { it.name != "Основний словник" } // Приклад фільтрації, якщо потрібно
+        allGroups.filter { it.name != "Основний словник" }
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     private val _showGroupDialog = MutableStateFlow(false)
@@ -43,22 +43,20 @@ class TranslateViewModel(
     private var groupsListenerRegistration: ListenerRegistration? = null
 
     init {
-        _selectedGroupId.value = null // Або ID групи "Основний словник" за замовчуванням
+        _selectedGroupId.value = null
         loadGroups()
     }
 
     fun setUkText(text: String) {
         _ukText.value = text
-        if (text.isBlank() && _enText.value.isBlank()) { // Якщо обидва поля порожні
-            // _selectedGroupId.value = null // Можна скидати групу, якщо логіка це передбачає
+        if (text.isBlank() && _enText.value.isBlank()) {
         }
-        _statusMessage.value = null // Скидаємо повідомлення при зміні тексту
+        _statusMessage.value = null
     }
 
     fun setEnText(text: String) {
         _enText.value = text
         if (text.isBlank() && _ukText.value.isBlank()) {
-            // _selectedGroupId.value = null
         }
         _statusMessage.value = null
     }
@@ -71,7 +69,6 @@ class TranslateViewModel(
             _groups.value = fetched
             Log.d("TranslateVM", "Groups fetched. Count: ${fetched.size}. First: ${fetched.firstOrNull()?.name}")
             val currentSelected = _selectedGroupId.value
-            // Якщо вибрана група більше не існує (наприклад, видалена), скидаємо вибір
             if (currentSelected != null && fetched.none { it.id == currentSelected }) {
                 _selectedGroupId.value = null
                 Log.d("TranslateVM", "Selected group $currentSelected no longer exists, resetting to null.")
@@ -79,7 +76,6 @@ class TranslateViewModel(
         }
     }
 
-    // !!! ОНОВЛЕНИЙ МЕТОД ПЕРЕКЛАДУ !!!
     fun translate() {
         if (_isLoading.value) {
             Log.d("TranslateVM", "Translate called while already loading, ignoring.")
@@ -90,16 +86,16 @@ class TranslateViewModel(
         val enTextValue = _enText.value.trim()
 
         val textToTranslate: String
-        val targetLangForApi: String // Мова, НА яку ми хочемо перекласти (для DeepL)
-        val sourceFieldIsUk: Boolean   // Чи було українське поле джерелом для перекладу
+        val targetLangForApi: String
+        val sourceFieldIsUk: Boolean
 
         if (ukTextValue.isNotBlank() && enTextValue.isBlank()) {
-            textToTranslate = ukTextValue    // Текст з українського поля
-            targetLangForApi = "en"          // Хочемо отримати англійський переклад
+            textToTranslate = ukTextValue
+            targetLangForApi = "en"
             sourceFieldIsUk = true
         } else if (enTextValue.isNotBlank() && ukTextValue.isBlank()) {
-            textToTranslate = enTextValue    // Текст з англійського поля
-            targetLangForApi = "uk"          // Хочемо отримати український переклад
+            textToTranslate = enTextValue
+            targetLangForApi = "uk"
             sourceFieldIsUk = false
         } else {
             _statusMessage.value = if (ukTextValue.isNotBlank() && enTextValue.isNotBlank()) {
@@ -112,36 +108,33 @@ class TranslateViewModel(
         }
 
         _isLoading.value = true
-        _statusMessage.value = null // Очищаємо попередні повідомлення
+        _statusMessage.value = null
         Log.i("TranslateVM", "Calling translationRepository.translateForUserVocabularySuspend for '$textToTranslate' -> $targetLangForApi")
 
         viewModelScope.launch {
             val translationResult: String? = try {
-                // Викликаємо нову suspend функцію з TranslationRepository
                 translationRepository.translateForUserVocabularySuspend(textToTranslate, targetLangForApi)
             } catch (e: Exception) {
                 Log.e("TranslateVM", "Exception during translateForUserVocabularySuspend for '$textToTranslate'", e)
-                _statusMessage.value = "Помилка перекладу: ${e.message}" // Встановлюємо повідомлення про помилку
-                null // Повертаємо null у разі винятку
+                _statusMessage.value = "Помилка перекладу: ${e.message}"
+                null
             }
 
-            // Цей блок виконається ПІСЛЯ того, як translateForUserVocabularySuspend завершиться
-            _isLoading.value = false // Гарантовано скидаємо стан завантаження
+            _isLoading.value = false
             Log.d("TranslateVM", "Translation result for '$textToTranslate': '$translationResult'. isLoading set to false.")
 
             if (translationResult != null) {
-                val cleanTranslationResult = translationResult.trim() // Очищаємо результат перед присвоєнням
-                if (sourceFieldIsUk) { // Якщо перекладали з українського поля (_ukText)
-                    _enText.value = cleanTranslationResult // Результат (англійський) вставляємо в _enText
-                } else { // Якщо перекладали з англійського поля (_enText)
-                    _ukText.value = cleanTranslationResult // Результат (український) вставляємо в _ukText
+                val cleanTranslationResult = translationResult.trim()
+                if (sourceFieldIsUk) {
+                    _enText.value = cleanTranslationResult
+                } else {
+                    _ukText.value = cleanTranslationResult
                 }
-                if (_statusMessage.value == null) { // Показуємо успіх, тільки якщо не було помилки
+                if (_statusMessage.value == null) {
                     _statusMessage.value = "Переклад отримано."
                 }
                 Log.d("TranslateVM", "Text fields updated. UK: '${_ukText.value}', EN: '${_enText.value}'")
             } else {
-                // Якщо translationResult == null І не було встановлено повідомлення про помилку через виняток
                 if (_statusMessage.value == null) {
                     _statusMessage.value = "Не вдалося отримати переклад для '$textToTranslate'."
                 }
@@ -150,12 +143,11 @@ class TranslateViewModel(
         }
     }
 
-    // Функція збереження слова (залишається як є, її логіка перевірки дублікатів перед збереженням у групу актуальна)
     fun saveWord() {
-        if (_isLoading.value) return // Не зберігаємо, якщо йде інша операція (наприклад, переклад)
+        if (_isLoading.value) return
 
-        val originalToSave = _ukText.value.trim() // Припускаємо, що українське поле - це "оригінал" для збереження
-        val translatedToSave = _enText.value.trim() // Англійське - це "переклад"
+        val originalToSave = _ukText.value.trim()
+        val translatedToSave = _enText.value.trim()
         val groupIdToSave = _selectedGroupId.value
 
         if (originalToSave.isBlank() || translatedToSave.isBlank()) {
@@ -169,11 +161,6 @@ class TranslateViewModel(
 
         viewModelScope.launch {
             firebaseRepository.getWordObject(originalToSave) { existingWord ->
-                // Цей колбек від getWordObject може прийти не на Main потоці,
-                // але подальші оновлення StateFlow безпечні з будь-якого потоку.
-                // Для чистоти, можна було б обгорнути вміст колбеку в launch(Dispatchers.Main) або viewModelScope.launch,
-                // але зазвичай оновлення StateFlow з фонових потоків працюють.
-
                 val isDuplicateInTargetGroup = existingWord != null && existingWord.dictionaryId == groupIdToSave
 
                 if (isDuplicateInTargetGroup) {
@@ -183,26 +170,24 @@ class TranslateViewModel(
                     Log.w("TranslateVM", "Duplicate word '$originalToSave' in target group '$groupName'.")
                 } else {
                     val wordToSave = existingWord?.copy(
-                        translation = translatedToSave, // Оновлюємо переклад, якщо слово вже існує
-                        dictionaryId = groupIdToSave    // Оновлюємо групу
+                        translation = translatedToSave,
+                        dictionaryId = groupIdToSave
                     ) ?: Word(
                         id = UUID.randomUUID().toString(),
-                        text = originalToSave,       // Українське слово
-                        translation = translatedToSave, // Англійський переклад
+                        text = originalToSave,
+                        translation = translatedToSave,
                         dictionaryId = groupIdToSave,
                         repetition = 0, easiness = 2.5f, interval = 0L, lastReviewed = 0L, nextReview = 0L, status = "new"
                     )
 
                     firebaseRepository.saveWord(wordToSave) { success ->
-                        // Колбек від saveWord (з FirebaseRepository) має бути (Boolean) -> Unit
-                        viewModelScope.launch { // Перемикаємось на viewModelScope (зазвичай Main) для оновлення стану
+                        viewModelScope.launch {
                             _isLoading.value = false
                             if (success) {
                                 val groupName = if (groupIdToSave.isNullOrBlank()) "Основний словник" else _groups.value.find { it.id == groupIdToSave }?.name ?: "обрану групу"
                                 _statusMessage.value = "Слово '$originalToSave' додано в $groupName."
                                 _ukText.value = ""
                                 _enText.value = ""
-                                // _selectedGroupId.value = null // Можливо, не скидати, якщо користувач хоче додати ще слів у ту ж групу
                                 Log.i("TranslateVM", "Word '$originalToSave' saved successfully to group '$groupName'.")
                             } else {
                                 _statusMessage.value = "Помилка збереження слова."
@@ -214,10 +199,9 @@ class TranslateViewModel(
             }
         }
     }
-    // Функції для управління видимістю діалога груп
     fun showGroupDialog() {
         _showGroupDialog.value = true
-        _statusMessage.value = null // Очищаємо повідомлення при відкритті діалога
+        _statusMessage.value = null
     }
 
     fun hideGroupDialog() {
@@ -241,7 +225,6 @@ class TranslateViewModel(
             _isLoading.value = false
             if (success) {
                 _statusMessage.value = "Група '$name' створена."
-                // loadGroups() не потрібен, listener сам оновить _groups.value
             } else {
                 _statusMessage.value = "Помилка створення групи '$name'."
             }
@@ -249,16 +232,15 @@ class TranslateViewModel(
     }
 
     fun renameGroup(groupId: String, newName: String) {
-        if (_isLoading.value) return // Перевіряємо, не йде ли вже операція
+        if (_isLoading.value) return
         _isLoading.value = true
         _statusMessage.value = null
 
         viewModelScope.launch {
-            val success = firebaseRepository.updateGroup(groupId, newName) // Викликаємо suspend метод Repository
+            val success = firebaseRepository.updateGroup(groupId, newName)
             _isLoading.value = false
             if (success) {
                 _statusMessage.value = "Група перейменована на '$newName'."
-                // loadGroups() не потрібен
             } else {
                 _statusMessage.value = "Помилка перейменування групи."
             }
@@ -266,7 +248,7 @@ class TranslateViewModel(
     }
 
     fun deleteGroup(groupId: String) {
-        if (_isLoading.value) return // Перевіряємо, не йде ли вже операція
+        if (_isLoading.value) return
         _isLoading.value = true
         _statusMessage.value = null
 
@@ -277,7 +259,7 @@ class TranslateViewModel(
                 _statusMessage.value = "Група видалена."
 
                 if (_selectedGroupId.value == groupId) {
-                    _selectedGroupId.value = null // <-- Сбрасываем в null
+                    _selectedGroupId.value = null
                 }
             } else {
                 _statusMessage.value = "Помилка видалення групи."

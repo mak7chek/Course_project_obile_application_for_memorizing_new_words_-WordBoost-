@@ -47,8 +47,8 @@ class PracticeRepository(private val firebase: FirebaseRepository) {
         }
     }
 
-    fun saveWord(word: Word, callback: (Boolean) -> Unit) { // <--- ПЕРЕКОНАЙСЯ, ЩО ТУТ (Boolean) -> Unit
-        firebase.saveWord(word) { success -> // firebase.saveWord вже повертає Boolean
+    fun saveWord(word: Word, callback: (Boolean) -> Unit) {
+        firebase.saveWord(word) { success ->
             if (success) {
                 Log.d("PracticeRepo", "Word ${word.id} saved successfully via Firebase.")
                 callback(true)

@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 import androidx.annotation.VisibleForTesting
-
 enum class PromptContentType { Original, Translation }
 enum class CardState { Prompt, Answer }
 
@@ -77,14 +76,10 @@ class PracticeViewModel(
 
     init {
         Log.i("PracticeVM_Lifecycle", "ViewModel initialized (init block). Will call startOrRefreshSession via UI.")
-        // Не викликаємо collectWordsForPractice() тут напряму.
-        // UI (PracticeScreen) викличе startOrRefreshSession() в LaunchedEffect.
     }
 
     fun startOrRefreshSession() {
         Log.i("PracticeVM_Lifecycle", "[startOrRefreshSession] Called. Current phase: ${_practicePhase.value}")
-        // Цей метод тепер є основною точкою входу для запуску/перезапуску сесії.
-        // collectWordsForPractice сам обробляє скидання станів і встановлення Loading.
         collectWordsForPractice()
     }
 
@@ -274,11 +269,7 @@ class PracticeViewModel(
                     Log.w("PracticeVM_Process", "Word processed in UNEXPECTED phase: $currentPhase.")
                 }
             }
-            // Якщо PracticeRepository.saveWord має callback: () -> Unit:
-            // practiceRepository.saveWord(updatedWord) {
-            //     Log.i("PracticeVM_Process", "saveWord CALLBACK for '${updatedWord.text}'. (No success bool)")
-            //     // ... решта логіки ...
-            // }
+
         }
     }
 
@@ -337,7 +328,7 @@ class PracticeViewModel(
 
         val currentPhaseIsPairing = _practicePhase.value is PracticePhase.BatchPairing
         val stackNowEmpty = undoStack.isEmpty()
-        _canUndo.value = !(currentPhaseIsPairing && stackNowEmpty) // Блокуємо, якщо відкотилися до BatchPairing і стек порожній
+        _canUndo.value = !(currentPhaseIsPairing && stackNowEmpty)
         Log.i("UndoDebug", "_canUndo set to: ${_canUndo.value}. currentPhaseIsPairing: $currentPhaseIsPairing, stackNowEmpty: $stackNowEmpty")
         ttsService.stop()
     }

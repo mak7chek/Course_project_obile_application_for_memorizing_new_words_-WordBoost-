@@ -8,7 +8,7 @@ import com.example.wordboost.data.firebase.FirebaseRepository
 import com.example.wordboost.data.model.SharedCardSet
 import com.example.wordboost.data.model.SharedSetWordItem
 import com.example.wordboost.data.model.UserSharedSetProgress
-import com.example.wordboost.data.model.Word // Твоя основна модель Word для особистого словника
+import com.example.wordboost.data.model.Word
 import com.example.wordboost.data.tts.TextToSpeechService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -22,8 +22,8 @@ import java.util.UUID
 
 
 data class SharedSetDetailsWithWords(
-    val setInfo: SharedCardSet,          // Метадані самого набору
-    val words: List<SharedSetWordItem> // Список слів у цьому наборі
+    val setInfo: SharedCardSet,
+    val words: List<SharedSetWordItem>
 )
 class BrowseSharedSetViewModel(
     private val sharedSetId: String,
@@ -51,7 +51,7 @@ class BrowseSharedSetViewModel(
     val currentWordListPositionDisplay: StateFlow<Int> = _currentWordListPosition
 
     val totalWordsInSet: StateFlow<Int> = MutableStateFlow(0)
-    val operationStatus = MutableStateFlow<String?>(null) // Для Snackbar
+    val operationStatus = MutableStateFlow<String?>(null)
 
     private var userProgressData: UserSharedSetProgress? = null
     private var translationDisplayJob: Job? = null
@@ -75,7 +75,7 @@ class BrowseSharedSetViewModel(
                 Log.e("BrowseSetVM", "User not logged in!")
                 operationStatus.value = "Помилка: користувач не авторизований."
                 _isLoading.value = false
-                _isSetCompleted.value = true // Показуємо екран завершення/помилки
+                _isSetCompleted.value = true
                 return@launch
             }
 
@@ -92,25 +92,24 @@ class BrowseSharedSetViewModel(
             setResult.fold(
                 onSuccess = { setWithWords ->
                     allWordsInCurrentSet = setWithWords.words
-                    _setDetailsWithWords.value = setWithWords // Зберігаємо для доступу до setInfo
+                    _setDetailsWithWords.value = setWithWords
                     (totalWordsInSet as MutableStateFlow).value = allWordsInCurrentSet.size
                     Log.d("BrowseSetVM", "Set '${setWithWords.setInfo.name_uk}' loaded with ${allWordsInCurrentSet.size} words.")
 
                     if (allWordsInCurrentSet.isEmpty()) {
                         _isSetCompleted.value = true
                         _currentDisplayWordItem.value = null
-                        saveUserProgress(completed = true, currentIndex = 0) // Зберігаємо, що порожній набір "пройдено"
+                        saveUserProgress(completed = true, currentIndex = 0)
                     } else {
-                        // Якщо індекс вийшов за межі або набір був пройдений, але слова додалися
                         if (_currentWordListPosition.value >= allWordsInCurrentSet.size) {
-                            if (!previouslyCompleted) { // Якщо не був завершений, а індекс за межами (набір зменшився)
+                            if (!previouslyCompleted) {
                                 Log.w("BrowseSetVM", "Current index ${_currentWordListPosition.value} out of bounds (${allWordsInCurrentSet.size}). Resetting to 0.")
                                 _currentWordListPosition.value = 0
                                 _isSetCompleted.value = false
-                            } else { // Був завершений і індекс в кінці або за межами
+                            } else {
                                 _isSetCompleted.value = true
                             }
-                        } else { // Індекс в межах
+                        } else {
                             _isSetCompleted.value = previouslyCompleted && (_currentWordListPosition.value >= allWordsInCurrentSet.size)
                         }
 
@@ -158,22 +157,20 @@ class BrowseSharedSetViewModel(
             }
         }
 
-        _currentWordListPosition.value = nextIndexToShow // Оновлюємо позицію до фактично показаного слова або кінця списку
+        _currentWordListPosition.value = nextIndexToShow
 
         if (wordToShow != null) {
             _currentDisplayWordItem.value = wordToShow
-            _isSetCompleted.value = false // Якщо ми показуємо слово, набір ще не завершено
+            _isSetCompleted.value = false
             Log.d("BrowseSetVM", "Displaying word: '${wordToShow.originalText}' (index in list: $nextIndexToShow)")
             translationDisplayJob = viewModelScope.launch {
                 delay(translationDelayMs)
                 _showTranslation.value = true
             }
         } else {
-            // Всі слова пройдені або проігноровані
             Log.d("BrowseSetVM", "All words processed/ignored. Marking set as completed.")
             _currentDisplayWordItem.value = null
             _isSetCompleted.value = true
-            // _currentWordListPosition.value вже буде = allWordsInCurrentSet.size
             saveUserProgress(completed = true, currentIndex = _currentWordListPosition.value)
         }
     }
@@ -191,7 +188,7 @@ class BrowseSharedSetViewModel(
     private fun processWordAction(sharedWordItem: SharedSetWordItem, addToVocabulary: Boolean) {
         translationDisplayJob?.cancel()
         _showTranslation.value = false
-        _currentDisplayWordItem.value = null // Прибираємо поточну картку, поки обробляється
+        _currentDisplayWordItem.value = null
 
         viewModelScope.launch {
             if (addToVocabulary) {
@@ -202,7 +199,6 @@ class BrowseSharedSetViewModel(
                     repetition = 0, easiness = 2.5f, interval = 0L, lastReviewed = 0L,
                     nextReview = System.currentTimeMillis(), status = "new"
                 )
-                // Використовуємо suspend версію для збереження
                 val success = firebaseRepository.savePersonalWordSuspend(newPersonalWord)
                 operationStatus.value = if (success) {
                     Log.i("BrowseSetVM", "Word '${newPersonalWord.text}' added to user's vocabulary.")
@@ -212,27 +208,25 @@ class BrowseSharedSetViewModel(
                     "Помилка додавання '${newPersonalWord.text}'."
                 }
             } else {
-                // Додаємо до списку ігнорованих
                 if (!ignoredWordIdsInThisSet.contains(sharedWordItem.id)) {
                     ignoredWordIdsInThisSet.add(sharedWordItem.id)
                 }
                 operationStatus.value = "'${sharedWordItem.originalText}' проігноровано."
             }
 
-            // Збільшуємо індекс, щоб вказувати на НАСТУПНЕ слово для displayNextWord
-            // І зберігаємо поточний стан (збільшений індекс та оновлений список ігнорованих)
+
             _currentWordListPosition.value++
             saveUserProgress(
                 completed = (_currentWordListPosition.value >= allWordsInCurrentSet.size),
                 currentIndex = _currentWordListPosition.value,
                 currentIgnoredList = ignoredWordIdsInThisSet.toList()
             )
-            displayNextWord() // Показуємо наступне слово або завершуємо
+            displayNextWord()
         }
     }
 
     fun replayWordSound() {
-        currentDisplayWordItem.value?.let { // Використовуємо вже оновлений StateFlow
+        currentDisplayWordItem.value?.let {
             Log.d("BrowseSetVM", "Replaying sound for '${it.originalText}'")
             ttsService.speak(it.originalText)
         }
@@ -241,7 +235,7 @@ class BrowseSharedSetViewModel(
     private fun saveUserProgress(
         completed: Boolean,
         currentIndex: Int,
-        currentIgnoredList: List<String>? = null // Дозволяємо передати оновлений список ігнорованих
+        currentIgnoredList: List<String>? = null
     ) {
         val userId = authRepository.getCurrentUser()?.uid
         if (userId == null) {
@@ -252,10 +246,9 @@ class BrowseSharedSetViewModel(
         val progress = UserSharedSetProgress(
             currentWordIndex = currentIndex,
             isCompleted = completed,
-            lastAccessed = null, // Firestore встановить серверний час завдяки @ServerTimestamp
+            lastAccessed = null,
             ignoredWordsInSet = currentIgnoredList ?: userProgressData?.ignoredWordsInSet ?: emptyList()
         )
-        // Оновлюємо локальну копію userProgressData для узгодженості
         userProgressData = progress.copy(ignoredWordsInSet = progress.ignoredWordsInSet.toList())
 
 
@@ -265,7 +258,6 @@ class BrowseSharedSetViewModel(
                 Log.d("BrowseSetVM", "User progress for set $sharedSetId saved. Index: ${progress.currentWordIndex}, Completed: ${progress.isCompleted}, Ignored: ${progress.ignoredWordsInSet.size}")
             } else {
                 Log.e("BrowseSetVM", "Failed to save user progress for set $sharedSetId.")
-                // Можливо, варто спробувати зберегти пізніше або повідомити користувача
             }
         }
     }

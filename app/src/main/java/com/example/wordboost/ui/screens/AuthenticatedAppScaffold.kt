@@ -1,15 +1,15 @@
 package com.example.wordboost.ui.screens
 
 import android.util.Log
-import androidx.compose.animation.AnimatedVisibility // Для анімації
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items // Важливо для items з key
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit // Іконка для редагування
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
@@ -33,12 +33,12 @@ import com.example.wordboost.viewmodel.SetsViewModelFactory
 import com.example.wordboost.viewmodel.WordListViewModelFactory
 import kotlinx.coroutines.launch
 
-// Імпорти для Material 3 Pull-to-Refresh
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.runtime.getValue // Для делегата 'by'
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.ViewModel
 
-// --- Composable для заголовка секції ---
 @Composable
 fun SectionHeader(
     title: String,
@@ -51,7 +51,7 @@ fun SectionHeader(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onToggleExpand)
-            .padding(vertical = 8.dp), // Додав відступ для клікабельної зони
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -67,18 +67,17 @@ fun SectionHeader(
     }
 }
 
-// --- Елемент списку для SharedCardSetSummary (ОНОВЛЕНИЙ) ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SharedCardSetSummaryItem(
     summary: SharedCardSetSummary,
     isMySet: Boolean,
-    onViewClick: () -> Unit,     // Окремий колбек для основного кліку (перегляд)
-    onEditClick: (() -> Unit)?,  // Опціональний колбек для кнопки редагування
-    onDeleteClick: (() -> Unit)? // Опціональний колбек для кнопки видалення
+    onViewClick: () -> Unit,
+    onEditClick: (() -> Unit)?,
+    onDeleteClick: (() -> Unit)?
 ) {
     Card(
-        onClick = onViewClick, // Основний клік по картці - перегляд
+        onClick = onViewClick,
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -102,18 +101,17 @@ fun SharedCardSetSummaryItem(
                 summary.authorName?.let {
                     Text("Автор: $it", style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic)
                 }
-                if (summary.public) { // Використовуємо 'public' з маленької, як у моделі
+                if (summary.public) {
                     Text("Публічний", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
             }
-            // Кнопки дій для "Моїх наборів"
             if (isMySet) {
-                onEditClick?.let { editClick -> // Якщо колбек для редагування передано
+                onEditClick?.let { editClick ->
                     IconButton(onClick = editClick) {
                         Icon(Icons.Filled.Edit, contentDescription = "Редагувати набір", tint = MaterialTheme.colorScheme.secondary)
                     }
                 }
-                onDeleteClick?.let { deleteClick -> // Якщо колбек для видалення передано
+                onDeleteClick?.let { deleteClick ->
                     IconButton(onClick = deleteClick) {
                         Icon(Icons.Filled.Delete, contentDescription = "Видалити набір", tint = MaterialTheme.colorScheme.error)
                     }
@@ -124,15 +122,16 @@ fun SharedCardSetSummaryItem(
 }
 
 
-// --- Екран "Набори" (SetsScreen) (ОНОВЛЕНИЙ) ---
+
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SetsScreen(
     viewModel: SetsViewModel,
     onNavigateToCreateSet: () -> Unit,
-    onNavigateToViewPublicSet: (setId: String) -> Unit, // Для перегляду публічного
-    onNavigateToBrowseMySet: (setId: String) -> Unit,    // Для перегляду свого
-    onNavigateToEditSet: (setId: String) -> Unit        // Для редагування свого
+    onNavigateToViewPublicSet: (setId: String) -> Unit,
+    onNavigateToBrowseMySet: (setId: String) -> Unit,
+    onNavigateToEditSet: (setId: String) -> Unit
 ) {
     val mySets by viewModel.mySets.collectAsState()
     val publicSets by viewModel.publicSets.collectAsState()
@@ -168,11 +167,10 @@ fun SetsScreen(
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), // Невеликі вертикальні відступи
-                verticalArrangement = Arrangement.spacedBy(8.dp) // Відступ між елементами LazyColumn
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // --- Секція "Мої набори" ---
-                item { // Заголовок секції
+                item {
                     SectionHeader(
                         title = "Мої набори",
                         isExpanded = isMySetsExpanded,
@@ -180,7 +178,7 @@ fun SetsScreen(
                         onToggleExpand = { viewModel.toggleMySetsExpanded() }
                     )
                 }
-                item { // Контент секції, що згортається
+                item {
                     AnimatedVisibility(visible = isMySetsExpanded) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (mySets.isNotEmpty()) {
@@ -201,7 +199,6 @@ fun SetsScreen(
                                     textAlign = TextAlign.Center
                                 )
                             }
-                            // Невеликий відступ знизу, якщо список розгорнутий і порожній або має елементи
                             if (mySets.isEmpty() && !isLoadingMySets || mySets.isNotEmpty()) {
                                 Spacer(Modifier.height(8.dp))
                             }
@@ -209,8 +206,7 @@ fun SetsScreen(
                     }
                 }
 
-                // --- Секція "Публічні набори" ---
-                item { // Заголовок секції
+                item {
                     SectionHeader(
                         title = "Публічні набори",
                         isExpanded = isPublicSetsExpanded,
@@ -218,7 +214,7 @@ fun SetsScreen(
                         onToggleExpand = { viewModel.togglePublicSetsExpanded() }
                     )
                 }
-                item { // Контент секції, що згортається
+                item {
                     AnimatedVisibility(visible = isPublicSetsExpanded) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (publicSets.isNotEmpty()) {
@@ -247,21 +243,14 @@ fun SetsScreen(
                 }
             }
 
-            PullToRefreshContainer(
-                state = pullRefreshState,
-                modifier = Modifier.align(Alignment.TopCenter)
-            )
         }
     }
 }
 
-
-// --- Екран "Статті" (ArticlesScreen) ---
 @Composable
-fun ArticlesScreen() { /* ... (код без змін) ... */ Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){Text("Екран Статей",style=MaterialTheme.typography.headlineMedium);Text("Ця функція в розробці.")} }
+fun ArticlesScreen() { Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){Text("Екран Статей",style=MaterialTheme.typography.headlineMedium);Text("Ця функція в розробці.")} }
 
 
-// --- AuthenticatedAppScaffold (ОНОВЛЕНИЙ виклик SetsScreen) ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthenticatedAppScaffold(
@@ -301,12 +290,9 @@ fun AuthenticatedAppScaffold(
                     viewModel = viewModel,
                     onNavigateToCreateSet = onNavigateToCreateSet,
                     onNavigateToViewPublicSet = { setId -> onNavigateToBrowseSet(setId) },
-                    onNavigateToBrowseMySet = { setId -> onNavigateToBrowseSet(setId) }, // Можна тимчасово вести на той самий екран
-                    onNavigateToEditSet = { setId -> onNavigateToEditSet(setId) }     // Передаємо новий колбек
+                    onNavigateToBrowseMySet = { setId -> onNavigateToBrowseSet(setId) },
+                    onNavigateToEditSet = { setId -> onNavigateToEditSet(setId) }
                 )
-            }
-            composable(BottomNavItem.Articles.route) {
-                ArticlesScreen()
             }
         }
     }

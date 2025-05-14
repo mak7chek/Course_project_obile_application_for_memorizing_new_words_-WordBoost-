@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text // Додано, якщо буде використовуватися Text напряму
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,9 +21,9 @@ import com.example.wordboost.viewmodel.CreateSetViewModelFactory
 import com.example.wordboost.viewmodel.EditWordViewModelFactory
 import com.example.wordboost.viewmodel.PracticeViewModelFactory
 import com.example.wordboost.ui.screens.BrowseSharedSetScreen
-import com.example.wordboost.viewmodel.TranslateViewModelFactory // Можливо, знадобиться, якщо TranslateScreen приймає factory
+import com.example.wordboost.viewmodel.TranslateViewModelFactory
 import com.example.wordboost.viewmodel.WordListViewModelFactory
-import com.example.wordboost.viewmodel.SetsViewModelFactory // Додано factory для SetsScreen
+import com.example.wordboost.viewmodel.SetsViewModelFactory
 import com.example.wordboost.ui.screens.createset.CreateSetScreen
 import com.example.wordboost.viewmodel.BrowseSharedSetViewModel
 import com.example.wordboost.viewmodel.BrowseSetViewModelFactory
@@ -56,17 +56,16 @@ fun MainScreen(
     var currentAuthSubState by remember { mutableStateOf(AuthSubState.AuthChoice) }
     var editingWordIdForFullScreen by remember { mutableStateOf<String?>(null) }
     var currentSetIdForBrowse by remember { mutableStateOf<String?>(null) }
-    var editingSetId by remember { mutableStateOf<String?>(null) } // Для ID набору, що редагується
+    var editingSetId by remember { mutableStateOf<String?>(null) }
 
-    // --- Factories ---
-    // ... (твій код для factories, він виглядав правильно)
+
     val practiceViewModelFactory = remember(practiceRepo, ttsService, authRepo) { PracticeViewModelFactory(repository = practiceRepo, ttsService = ttsService, authRepository = authRepo) }
     val wordListViewModelFactory = remember(firebaseRepo, authRepo, ttsService) { WordListViewModelFactory(repository = firebaseRepo, authRepository = authRepo, ttsService = ttsService) }
     val editWordViewModelFactoryBuilder = remember(firebaseRepo) { { wordId: String? -> EditWordViewModelFactory(repository = firebaseRepo, wordId = wordId) } }
     val createSetViewModelFactory = remember(firebaseRepo, translationRepo, authRepo) { CreateSetViewModelFactory(firebaseRepository = firebaseRepo, translationRepository = translationRepo, authRepository = authRepo) }
     val setsViewModelFactory = remember(firebaseRepo, authRepo) { SetsViewModelFactory(firebaseRepository = firebaseRepo, authRepository = authRepo) }
-    // Factory для BrowseSharedSetViewModel буде створюватися динамічно нижче
-    LaunchedEffect(key1 = authRepo) { // key1 для уникнення попередження, можна Unit, якщо authRepo не змінюється
+
+    LaunchedEffect(key1 = authRepo) {
         Log.d("MainScreen", "Auth state listener collection started.")
         authRepo.getAuthState().collect { user ->
             val previousState = currentTopLevelScreenState
@@ -82,8 +81,8 @@ fun MainScreen(
             } else if (user != null && !user.isEmailVerified) {
                 Log.d("MainScreen", "User authenticated but NOT verified. Directing to AuthFlow/Login.")
                 currentTopLevelScreenState = TopLevelScreenState.AuthFlow
-                currentAuthSubState = AuthSubState.Login // Направляємо на логін, де може бути повідомлення про верифікацію
-            } else { // user is null
+                currentAuthSubState = AuthSubState.Login
+            } else {
                 Log.d("MainScreen", "User is null (logged out). Directing to AuthFlow/AuthChoice.")
                 currentTopLevelScreenState = TopLevelScreenState.AuthFlow
                 currentAuthSubState = AuthSubState.AuthChoice
@@ -91,7 +90,6 @@ fun MainScreen(
             Log.d("MainScreen", "TopLevelScreenState updated to: $currentTopLevelScreenState, AuthSubState: $currentAuthSubState")
         }
     }
-
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         when (currentTopLevelScreenState) {
             TopLevelScreenState.Loading -> {
@@ -107,13 +105,13 @@ fun MainScreen(
                         onLoginClick = { currentAuthSubState = AuthSubState.Login },
                         onRegisterClick = { currentAuthSubState = AuthSubState.Register }
                     )
-                    AuthSubState.Login -> LoginScreen( // Переконайся, що LoginScreen імпортовано або в цьому файлі
+                    AuthSubState.Login -> LoginScreen(
                         authRepo = authRepo,
-                        onSuccess = { /* Стан зміниться через LaunchedEffect */ },
+                        onSuccess = { },
                         onBack = { currentAuthSubState = AuthSubState.AuthChoice },
                         onNavigateToRegister = { currentAuthSubState = AuthSubState.Register }
                     )
-                    AuthSubState.Register -> RegisterScreen( // Переконайся, що RegisterScreen імпортовано
+                    AuthSubState.Register -> RegisterScreen(
                         authRepo = authRepo,
                         onRegistrationSuccess = { currentAuthSubState = AuthSubState.Login },
                         onBack = { currentAuthSubState = AuthSubState.AuthChoice }
@@ -127,7 +125,7 @@ fun MainScreen(
                     onNavigateToPractice = { currentTopLevelScreenState = TopLevelScreenState.PracticeSessionFullScreen },
                     onNavigateToWordList = { currentTopLevelScreenState = TopLevelScreenState.WordListFullScreen },
                     onNavigateToCreateSet = {
-                        editingSetId = null // Скидаємо ID редагування, бо це створення нового
+                        editingSetId = null
                         currentTopLevelScreenState = TopLevelScreenState.CreateSetWizardFullScreen
                     },
                     onLogoutClick = { authRepo.logout() },
@@ -136,11 +134,10 @@ fun MainScreen(
                         currentSetIdForBrowse = setId
                         currentTopLevelScreenState = TopLevelScreenState.BrowseSharedSetFullScreen
                     },
-                    // !!! ДОДАНО КОЛБЕК onNavigateToEditSet !!!
                     onNavigateToEditSet = { setIdToEdit ->
                         Log.i("MainScreen_Nav", "Action to EDIT set ID: '$setIdToEdit'. Changing TopLevelScreenState to CreateSetWizardFullScreen for editing.")
-                        editingSetId = setIdToEdit // Зберігаємо ID набору, що редагується
-                        currentTopLevelScreenState = TopLevelScreenState.CreateSetWizardFullScreen // Йдемо на той самий екран створення/редагування
+                        editingSetId = setIdToEdit
+                        currentTopLevelScreenState = TopLevelScreenState.CreateSetWizardFullScreen
                     },
                     wordListViewModelFactory = wordListViewModelFactory,
                     setsViewModelFactory = setsViewModelFactory
@@ -148,7 +145,7 @@ fun MainScreen(
             }
             TopLevelScreenState.TranslateWordFullScreen -> {
                 Log.d("MainScreen", "Showing TranslateWordFullScreen")
-                TranslateScreen( // Переконайся, що TranslateScreen імпортовано
+                TranslateScreen(
                     firebaseRepo = firebaseRepo,
                     translationRepo = translationRepo,
                     onBack = { currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp }
@@ -156,14 +153,14 @@ fun MainScreen(
             }
             TopLevelScreenState.PracticeSessionFullScreen -> {
                 Log.d("MainScreen", "Showing PracticeSessionFullScreen")
-                PracticeScreen( // Переконайся, що PracticeScreen імпортовано
+                PracticeScreen(
                     factory = practiceViewModelFactory,
                     onBack = { currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp }
                 )
             }
             TopLevelScreenState.WordListFullScreen -> {
                 Log.d("MainScreen", "Showing WordListFullScreen")
-                WordListScreen( // Переконайся, що WordListScreen імпортовано
+                WordListScreen(
                     repository = firebaseRepo,
                     ttsService = ttsService,
                     authRepository = authRepo,
@@ -176,7 +173,7 @@ fun MainScreen(
             }
             TopLevelScreenState.EditWordFullScreen -> {
                 Log.d("MainScreen", "Showing EditWordFullScreen for wordId: $editingWordIdForFullScreen")
-                EditWordScreen( // Переконайся, що EditWordScreen імпортовано
+                EditWordScreen(
                     wordId = editingWordIdForFullScreen,
                     factory = editWordViewModelFactoryBuilder(editingWordIdForFullScreen),
                     onBack = {
@@ -188,34 +185,30 @@ fun MainScreen(
 
             TopLevelScreenState.CreateSetWizardFullScreen -> {
                 Log.i("MainScreen_Render", "Showing CreateSetWizardFullScreen. Current editingSetId: $editingSetId")
-                // Використовуємо editingSetId як ключ для ViewModel, щоб вона перестворювалася
-                // для "створення нового" (коли editingSetId = null) або для редагування конкретного набору.
-                val currentCreateEditSetId = editingSetId // Захоплюємо значення для ключа
+
+                val currentCreateEditSetId = editingSetId
                 val createSetViewModel: CreateSetViewModel = viewModel(
-                    key = currentCreateEditSetId ?: "create_new_set_mode", // Унікальний ключ
+                    key = currentCreateEditSetId ?: "create_new_set_mode",
                     factory = createSetViewModelFactory
                 )
 
-                // LaunchedEffect для завантаження даних, якщо це режим редагування
-                LaunchedEffect(currentCreateEditSetId, createSetViewModel) { // Залежить від ID та екземпляра ViewModel
+                LaunchedEffect(currentCreateEditSetId, createSetViewModel) {
                     if (currentCreateEditSetId != null) {
                         Log.d("MainScreen_CreateSet", "editingSetId is '$currentCreateEditSetId', calling loadSetForEditing.")
                         createSetViewModel.loadSetForEditing(currentCreateEditSetId)
                     } else {
                         Log.d("MainScreen_CreateSet", "editingSetId is null, resetting ViewModel for new set creation (if needed).")
-                        // createSetViewModel.resetAllState() // Розглянь, чи це потрібно тут,
-                        // оскільки новий ключ для viewModel() має створювати новий екземпляр.
-                        // resetAllState викликається при onCloseOrNavigateBack.
+
                     }
                 }
 
                 CreateSetScreen(
                     viewModel = createSetViewModel,
-                    isEditing = currentCreateEditSetId != null, // Передаємо прапорець режиму редагування
+                    isEditing = currentCreateEditSetId != null,
                     onCloseOrNavigateBack = {
                         Log.d("MainScreen_CreateSet", "Closing CreateSetWizard. Resetting ViewModel and editingSetId.")
                         createSetViewModel.resetAllState()
-                        editingSetId = null // Дуже важливо скинути ID редагування при виході
+                        editingSetId = null
                         currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp
                     }
                 )
@@ -249,7 +242,7 @@ fun MainScreen(
                     Log.d("MainScreen_Nav", "BrowseSharedSetScreen composed for $setIdForView.")
                 } else {
                     Log.e("MainScreen_Nav", "Error: currentSetIdForBrowse is NULL when trying to display BrowseSharedSetFullScreen. Navigating back to AuthenticatedApp.")
-                    LaunchedEffect(Unit) { // Щоб безпечно змінити стан не під час композиції
+                    LaunchedEffect(Unit) {
                         currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp
                     }
                 }

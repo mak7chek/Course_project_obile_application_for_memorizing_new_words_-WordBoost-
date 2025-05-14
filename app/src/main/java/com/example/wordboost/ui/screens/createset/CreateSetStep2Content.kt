@@ -1,4 +1,3 @@
-// com.example.wordboost.ui.screens.createset.CreateSetStep2Content.kt
 package com.example.wordboost.ui.screens.createset
 
 import androidx.compose.foundation.layout.*

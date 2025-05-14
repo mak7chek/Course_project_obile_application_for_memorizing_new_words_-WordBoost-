@@ -7,10 +7,9 @@ import java.util.Date
 data class SharedCardSetSummary(
     @DocumentId val id: String = "",
     val name_uk: String = "",
-    // val name_en: String? = null, // Можна додати, якщо потрібно показувати в списку
-    val authorName: String? = null, // Або authorId, якщо ім'я будеш завантажувати окремо
+    val authorName: String? = null,
     val wordCount: Int = 0,
-    val difficultyLevelKey: String? = null, // Ключ з DifficultyLevel enum
+    val difficultyLevelKey: String? = null,
     val public: Boolean = false,
-    @ServerTimestamp var createdAt: Date? = null // Для сортування "новіші спочатку"
+    @ServerTimestamp var createdAt: Date? = null
 )

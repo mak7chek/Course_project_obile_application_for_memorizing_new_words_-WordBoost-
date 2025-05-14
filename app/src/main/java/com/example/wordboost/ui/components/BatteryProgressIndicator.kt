@@ -1,5 +1,4 @@
-// ui.components/BatteryProgressIndicator.kt
-package com.example.wordboost.ui.components // Ваш пакет
+package com.example.wordboost.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
@@ -17,17 +16,16 @@ import kotlin.math.max
 
 @Composable
 fun BatteryProgressIndicator(
-    progress: Float, // Прогрес від 0.0 до 1.0
+    progress: Float,
     modifier: Modifier = Modifier,
-    strokeWidth: Float = 3f // Товщина ліній індикатора
+    strokeWidth: Float = 3f
 ) {
-    // Визначаємо кольори індикатора залежно від прогресу
     val colorLow = Color.Red
     val colorMedium = Color.Yellow
     val colorHigh = Color.Green
 
-    val thresholdLow = 0.15f // Поріг для низького прогресу
-    val thresholdMedium = 0.40f // Поріг для середнього прогресу
+    val thresholdLow = 0.15f
+    val thresholdMedium = 0.40f
 
     val indicatorColor = when {
         progress <= thresholdLow -> colorLow
@@ -35,16 +33,13 @@ fun BatteryProgressIndicator(
         else -> colorHigh
     }
 
-    // Розміри батареї (якщо потрібно змінити загальний розмір компонента, використовуйте Modifier.size ззовні)
     val batteryHeight = 48f
     val batteryWidth = 32f
     val headHeight = 8f
     val headWidth = 10f
     val cornerRadius = 3f
 
-
     Canvas(modifier = modifier.size(batteryWidth.dp, (headHeight + batteryHeight).dp)) {
-        // Розміри елементів батареї відносно Canvas
         val headTop = 0f
         val headLeft = (size.width - headWidth) / 2
         val headBottom = headTop + headHeight
@@ -55,37 +50,31 @@ fun BatteryProgressIndicator(
         val bodyRight = bodyLeft + batteryWidth
         val bodyBottom = bodyTop + batteryHeight
 
-        // Малюємо голову батареї (обрис)
         drawRoundRect(
-            color = Color.Gray, // Колір обрису голови
+            color = Color.Gray,
             topLeft = Offset(headLeft, headTop),
             size = Size(headWidth, headHeight),
             cornerRadius = CornerRadius(cornerRadius, cornerRadius),
-            style = Stroke(width = strokeWidth / 2) // Товщина обрису
+            style = Stroke(width = strokeWidth / 2)
         )
 
-        // Малюємо тіло батареї (обрис)
         drawRoundRect(
-            color = Color.Gray, // Колір обрису тіла
+            color = Color.Gray,
             topLeft = Offset(bodyLeft, bodyTop),
             size = Size(batteryWidth, batteryHeight),
             cornerRadius = CornerRadius(cornerRadius, cornerRadius),
-            style = Stroke(width = strokeWidth) // Товщина обрису
+            style = Stroke(width = strokeWidth)
         )
 
-        // Розраховуємо розміри та позицію індикатора прогресу всередині тіла батареї
-        val indicatorHeight = max(0f, (batteryHeight - strokeWidth * 2) * progress) // Висота індикатора залежить від прогресу
-        val indicatorWidth = batteryWidth - strokeWidth * 2 // Ширина індикатора
-        val indicatorLeft = bodyLeft + strokeWidth // Ліва координата індикатора
-        // Верхня координата індикатора (зміщуємо вниз зі збільшенням прогресу)
+        val indicatorHeight = max(0f, (batteryHeight - strokeWidth * 2) * progress)
+        val indicatorWidth = batteryWidth - strokeWidth * 2
+        val indicatorLeft = bodyLeft + strokeWidth
         val indicatorTop = bodyTop + strokeWidth + (batteryHeight - strokeWidth * 2 - indicatorHeight)
 
-        // Малюємо індикатор прогресу
         drawRoundRect(
-            color = indicatorColor, // Колір індикатора (залежить від прогресу)
+            color = indicatorColor,
             topLeft = Offset(indicatorLeft, indicatorTop),
             size = Size(indicatorWidth, indicatorHeight),
-            // Закруглення кутів індикатора (трохи менше, ніж у обрису)
             cornerRadius = CornerRadius(cornerRadius - strokeWidth / 2, cornerRadius - strokeWidth / 2)
         )
     }

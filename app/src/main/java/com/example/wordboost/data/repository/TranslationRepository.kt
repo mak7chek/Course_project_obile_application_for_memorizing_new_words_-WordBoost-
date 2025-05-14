@@ -21,20 +21,14 @@ class TranslationRepository(
     suspend fun translateForUserVocabularySuspend(originalText: String, targetLang: String): String? {
         val textToTranslate = originalText.trim()
         if (textToTranslate.isBlank()) return null
-
-        // 1. Перевірка в особистому словнику Firebase
-        Log.d("TranslationRepo", "[UserVocabSuspend] Перевірка Firebase для: '$textToTranslate'")
         val firebaseResult = firebaseRepo.getTranslationSuspend(textToTranslate)
         if (firebaseResult != null) {
             Log.d("TranslationRepo", "[UserVocabSuspend] Знайдено у Firebase: '$textToTranslate' -> '$firebaseResult'")
-            // Якщо знайшли у Firebase, це вже "переклад" (або оригінал, якщо шукали за перекладом).
-            // Немає сенсу шукати далі або перекладати через DeepL.
-            // Питання: чи потрібно кешувати те, що вже є у Firebase? Ймовірно, ні.
-            return firebaseResult // Повертаємо те, що знайшли (це може бути переклад або оригінал)
+
+            return firebaseResult
         }
         Log.d("TranslationRepo", "[UserVocabSuspend] Не знайдено у Firebase для: '$textToTranslate'")
 
-        // 2. Перевірка в локальному кеші (Room)
         val cachedResult = withContext(Dispatchers.IO) {
             val cachedEntry: CacheEntity? = cacheDao.getCacheEntry(textToTranslate)
             if (cachedEntry != null) {
@@ -54,7 +48,6 @@ class TranslationRepository(
         Log.d("TranslationRepo", "[UserVocabSuspend] Не знайдено у кеші для: '$textToTranslate'")
 
         // 3. Якщо не знайдено ніде, використовуємо DeepL
-        Log.d("TranslationRepo", "[UserVocabSuspend] Використовуємо DeepL для '$textToTranslate' -> $targetLang")
         return suspendCancellableCoroutine { continuation ->
             realTranslator.translate(textToTranslate, targetLang) { deeplResult ->
                 val finalResult = deeplResult?.trim()
@@ -84,10 +77,7 @@ class TranslationRepository(
             val cachedEntry: CacheEntity? = cacheDao.getCacheEntry(text)
             if (cachedEntry != null) {
                 cacheDao.updateTimestamp(cachedEntry.original, System.currentTimeMillis())
-                Log.d(
-                    "TranslationRepo",
-                        "[TFSC_Suspend] Знайдено у кеші: ${cachedEntry.original} / ${cachedEntry.translated}"
-                    )
+
                 if (cachedEntry.original.equals(text, ignoreCase = true)) {
                     cachedEntry.translated
                 } else if (cachedEntry.translated.equals(text, ignoreCase = true)) {
@@ -102,12 +92,7 @@ class TranslationRepository(
         if (cachedResult != null) {
             return cachedResult
         }
-        // 2. Якщо не знайдено в кеші, використовуємо DeepL
-        // 2. DeepL
-        Log.d(
-            "TranslationRepo",
-            "[TFSC_Suspend] Не знайдено у кеші. Використовуємо DeepL для '$text' -> $targetLang"
-            )
+
         return suspendCancellableCoroutine { continuation ->
             realTranslator.translate(text, targetLang) { deeplResult ->
                 if (deeplResult != null) {
@@ -116,10 +101,6 @@ class TranslationRepository(
                             cacheDao.insertTranslation(
                                 text.trim(),
                                 deeplResult.trim()
-                            )
-                            Log.d(
-                                "TranslationRepo",
-                                "[TFSC_Suspend] Результат DeepL '$deeplResult' вставлено в кеш для '$text'"
                             )
                         }
                     } else {

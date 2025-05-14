@@ -79,7 +79,7 @@ fun CustomGroupDialog(
                             onCreateGroup(newGroupName)
                             newGroupName = ""
                         }
-                        creatingNewGroup = false // Закриваємо діалог створення/редагування
+                        creatingNewGroup = false
                     }
                     val onCancelEditCreate: () -> Unit = {
                         creatingNewGroup = false

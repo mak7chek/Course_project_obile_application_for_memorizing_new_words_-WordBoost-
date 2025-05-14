@@ -1,6 +1,6 @@
-package com.example.wordboost.ui.screens // Переконайтесь, що пакет правильний
+package com.example.wordboost.ui.screens
 
-import android.util.Log // Keep for BatchDebug
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -24,7 +24,7 @@ import androidx.compose.ui.res.painterResource
 import com.example.wordboost.R
 
 
-import kotlinx.coroutines.launch // Keep for snackbar coroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.collectAsState
 
 
@@ -36,26 +36,21 @@ fun PracticeScreen(
 ) {
     val viewModel: PracticeViewModel = viewModel(factory = factory)
 
-    // --- Спостерігаємо за Станами ViewModel ---
     val currentPracticePhase by viewModel.practicePhase.collectAsState()
     val currentCardState by viewModel.currentCardState.collectAsState()
     val currentWordPromptContentType by viewModel.currentWordPromptContentType.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
 
-    // Спостерігаємо за поточною партією та індексом
     val currentBatchWords by viewModel.currentBatch.collectAsState()
     val currentWordIndex by viewModel.currentWordIndexInBatch.collectAsState()
 
-    // !!! Спостерігаємо за станом можливості скасування з ViewModel !!!
     val canUndo by viewModel.canUndo.collectAsState()
 
 
-    // Обчислюємо поточне слово локально
     val currentWordInBatch = remember(currentBatchWords, currentWordIndex) {
         currentBatchWords.getOrNull(currentWordIndex)
     }
 
-    // Стан для Snackbar
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScopeSnackbar = rememberCoroutineScope()
 
@@ -138,7 +133,7 @@ fun PracticeScreen(
             }
 
             is PracticePhase.BatchRegular -> {
-                Log.d("BatchDebug", "PracticeScreen відображає BatchRegular. Поточний індекс слова: ${currentWordIndex}, Розмір партії: ${currentBatchWords.size}, Слово: ${currentWordInBatch?.text}") // Added ?.text for safety
+                Log.d("BatchDebug", "PracticeScreen відображає BatchRegular. Поточний індекс слова: ${currentWordIndex}, Розмір партії: ${currentBatchWords.size}, Слово: ${currentWordInBatch?.text}")
                 Log.d("CardStateDebug", "PracticeScreen відображає BatchRegular. Поточний cardState: $currentCardState, PromptContentType: $currentWordPromptContentType")
 
 

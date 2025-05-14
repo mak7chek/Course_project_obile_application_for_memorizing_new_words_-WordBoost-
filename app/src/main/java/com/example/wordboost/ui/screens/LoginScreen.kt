@@ -1,6 +1,11 @@
 package com.example.wordboost.ui.screens
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,7 +25,7 @@ fun LoginScreen(
     authRepo: AuthRepository,
     onSuccess: () -> Unit,
     onBack: () -> Unit,
-    onNavigateToRegister: () -> Unit // <--- ДОДАЙ ЦЕЙ ПАРАМЕТР
+    onNavigateToRegister: () -> Unit
 ) {
     val viewModel: LoginViewModel = viewModel(factory = AuthViewModelFactory(authRepo))
 

@@ -1,5 +1,4 @@
-// com.example.wordboost.ui.screens.createset.CreateSetStep1Content.kt
-package com.example.wordboost.ui.screens.createset // Оновлений пакет
+package com.example.wordboost.ui.screens.createset
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -7,7 +6,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.wordboost.viewmodel.CreateSetViewModel // Правильний шлях до ViewModel
+import com.example.wordboost.viewmodel.CreateSetViewModel
 
 @Composable
 fun CreateSetStep1Content(viewModel: CreateSetViewModel, modifier: Modifier = Modifier) {
@@ -15,7 +14,7 @@ fun CreateSetStep1Content(viewModel: CreateSetViewModel, modifier: Modifier = Mo
     val setNameUkError by viewModel.setNameUkError
 
     Column(
-        modifier = modifier // Цей Modifier має .weight(1f) від CreateSetScreen
+        modifier = modifier
             .fillMaxSize()
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

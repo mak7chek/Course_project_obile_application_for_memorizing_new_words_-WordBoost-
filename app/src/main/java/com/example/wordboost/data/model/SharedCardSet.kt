@@ -5,21 +5,20 @@ import com.google.firebase.firestore.ServerTimestamp
 import java.util.Date
 
 data class SharedCardSet(
-    @DocumentId // Firestore автоматично заповнить це поле ID документа
+    @DocumentId
     var id: String = "",
-    var name_uk: String = "", // Назва українською (Крок 1)
-    var name_en: String? = null, // Назва англійською (Крок 2, може бути авто-перекладена та редагована)
-    var description: String? = null, // Опис (опціонально)
-    var authorId: String = "",       // UID користувача-автора
-    var authorName: String? = null,  // Ім'я користувача-автора (для відображення)
-    var difficultyLevel: String = DifficultyLevel.MEDIUM.key, // Рівень складності (Крок 2), зберігаємо ключ enum
-    var public: Boolean = true,    // Видимість набору (Крок 4)
-    val languageOriginal: String = "en", // Зафіксовано для англо-українських наборів
-    val languageTranslation: String = "uk", // Зафіксовано
-    var wordCount: Int = 0,          // Кількість слів, оновлюється при збереженні
-    @ServerTimestamp // Firestore автоматично встановлює час створення
+    var name_uk: String = "",
+    var name_en: String? = null,
+    var description: String? = null,
+    var authorId: String = "",
+    var authorName: String? = null,
+    var difficultyLevel: String = DifficultyLevel.MEDIUM.key,
+    var public: Boolean = true,
+    val languageOriginal: String = "en",
+    val languageTranslation: String = "uk",
+    var wordCount: Int = 0,
+    @ServerTimestamp
     var createdAt: Date? = null,
-    @ServerTimestamp // Firestore автоматично встановлює час останнього оновлення
+    @ServerTimestamp
     var updatedAt: Date? = null
-    // Самі слова будуть зберігатися у підколекції "words" всередині цього документа
 )

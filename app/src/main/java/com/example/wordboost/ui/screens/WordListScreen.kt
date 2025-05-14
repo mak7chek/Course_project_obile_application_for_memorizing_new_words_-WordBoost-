@@ -1,4 +1,4 @@
-package com.example.wordboost.ui.screens // Переконайтесь, що пакет правильний
+package com.example.wordboost.ui.screens
 
 import android.util.Log
 import androidx.activity.compose.BackHandler
@@ -10,29 +10,25 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.collectAsState // ВИКОРИСТОВУЄМО collectAsState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-// Імпорти для фону
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Brush
 
-// Переконайтесь, що імпорти репозиторіїв, моделей та сервісів правильні
 import com.example.wordboost.data.firebase.AuthRepository
 import com.example.wordboost.data.firebase.FirebaseRepository
-import com.example.wordboost.data.model.Group // Переконайтесь в імпорті Group
-import com.example.wordboost.data.model.Word // Переконайтесь в імпорті Word
+import com.example.wordboost.data.model.Group
+import com.example.wordboost.data.model.Word
 import com.example.wordboost.data.tts.TextToSpeechService
-// Переконайтесь в імпорті ViewModel та Factory
 import com.example.wordboost.viewmodel.WordListViewModel
 import com.example.wordboost.viewmodel.WordListViewModelFactory
-import com.example.wordboost.viewmodel.WordDisplayItem // Переконайтесь в імпорті WordDisplayItem
-// Переконайтесь в імпорті WordListItem та GroupFilterDropdown
+import com.example.wordboost.viewmodel.WordDisplayItem
 import com.example.wordboost.ui.components.WordListItem
-import com.example.wordboost.ui.components.GroupFilterDropdown // Використовуємо перейменований компонент
+import com.example.wordboost.ui.components.GroupFilterDropdown
 
 
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -42,13 +38,12 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WordListScreen(
-    repository: FirebaseRepository, // Потрібен для Factory
-    ttsService: TextToSpeechService, // Потрібен для Factory
-    authRepository: AuthRepository, // Потрібен для Factory
-    onWordEdit: (wordId: String) -> Unit, // Колбек для навігації на редагування
-    onBack: () -> Unit // Колбек для повернення назад
+    repository: FirebaseRepository,
+    ttsService: TextToSpeechService,
+    authRepository: AuthRepository,
+    onWordEdit: (wordId: String) -> Unit,
+    onBack: () -> Unit
 ) {
-    // Отримуємо ViewModel за допомогою Factory
     val viewModel: WordListViewModel = viewModel(
         factory = WordListViewModelFactory(
             repository = repository,
@@ -68,7 +63,6 @@ fun WordListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
-    // LaunchedEffect для відображення повідомлень про помилку/статус
     LaunchedEffect(errorMessage) {
         errorMessage?.let { message ->
             coroutineScope.launch {
@@ -81,7 +75,6 @@ fun WordListScreen(
         }
     }
 
-    // Обробка натискання кнопки "Назад"
     BackHandler(enabled = true) { onBack() }
 
 
@@ -100,22 +93,18 @@ fun WordListScreen(
     ) { paddingValues ->
         Column(
             modifier = Modifier
-                .padding(paddingValues) // Застосовуємо паддінг від Scaffold та TopAppBar
+                .padding(paddingValues)
                 .fillMaxSize()
-                // ДОДАЄМО ГРАДІЄНТНИЙ ФОН
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            MaterialTheme.colorScheme.surfaceContainerHigh, // Колір зверху
-                            MaterialTheme.colorScheme.background // Колір знизу
-                            // Ви можете обрати інші кольори з вашої теми
+                            MaterialTheme.colorScheme.surfaceContainerHigh,
+                            MaterialTheme.colorScheme.background
                         )
                     )
                 ),
-            // Додаємо вертикальний відступ між елементами Column
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Поле пошуку
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { viewModel.setSearchQuery(it) },
@@ -123,26 +112,20 @@ fun WordListScreen(
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp) // Зменшено вертикальний відступ, бо є spacedBy
-                // !!! ПРИБРАНО ФІКСОВАНУ ВИСОТУ !!!
-                // .height(56.dp)
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
             )
 
-            // Фільтр за групами (тепер без фіксованої висоти Box)
             GroupFilterDropdown(
                 groups = groups,
                 selectedGroupId = selectedGroupIdFilter,
                 onGroupSelected = { groupId -> viewModel.setGroupFilter(groupId) }
             )
 
-            // Індикатор завантаження
             if (isLoading) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
 
-            // Відображення списку слів або повідомлення
             when {
-                // Показати індикатор
                 isLoading && displayedWords.isEmpty() -> {
                     Box(
                         modifier = Modifier
@@ -153,7 +136,6 @@ fun WordListScreen(
                         CircularProgressIndicator()
                     }
                 }
-                // Перевірка, якщо список порожній і НЕ завантажується
                 displayedWords.isEmpty() && !isLoading -> {
                     Box(
                         modifier = Modifier
@@ -174,7 +156,6 @@ fun WordListScreen(
                         )
                     }
                 }
-                // Якщо є слова для відображення і НЕ завантажується
                 displayedWords.isNotEmpty() && !isLoading -> {
                     LazyColumn(
                         modifier = Modifier

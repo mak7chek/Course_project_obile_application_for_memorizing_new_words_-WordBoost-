@@ -1,4 +1,3 @@
-// com.example.wordboost.ui.screens.createset.CreateSetStep3Content.kt
 package com.example.wordboost.ui.screens.createset
 
 import androidx.compose.foundation.layout.*
@@ -21,12 +20,11 @@ fun CreateSetStep3Content(viewModel: CreateSetViewModel, modifier: Modifier = Mo
     val currentTranslationWord by viewModel.currentTranslationWord
     val editingWordUiId by viewModel.editingWordUiId
     val isLoadingWordTranslation by viewModel.isLoading
-    // val operationMessageStep3 by viewModel.operationMessage // Тепер обробляється через Snackbar
 
     val focusManager = LocalFocusManager.current
 
     Column(
-        modifier = modifier // Цей Modifier вже має .weight(1f)
+        modifier = modifier
             .fillMaxSize()
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -85,7 +83,7 @@ fun CreateSetStep3Content(viewModel: CreateSetViewModel, modifier: Modifier = Mo
                     items = viewModel.temporaryWordsList.toList(),
                     key = { wordItem -> wordItem.id }
                 ) { wordItem ->
-                    TemporaryWordListItem( // Використовуємо імпортований Composable
+                    TemporaryWordListItem(
                         wordItem = wordItem,
                         onEdit = { viewModel.startEditTemporaryWord(wordItem) },
                         onDelete = { viewModel.deleteTemporaryWord(wordItem) },

@@ -33,10 +33,10 @@ class SetsViewModel(
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
     private val _showDeleteConfirmDialog = MutableStateFlow(false)
     val showDeleteConfirmDialog: StateFlow<Boolean> = _showDeleteConfirmDialog.asStateFlow()
-    private val _isMySetsExpanded = MutableStateFlow(true) // За замовчуванням розгорнуто
+    private val _isMySetsExpanded = MutableStateFlow(true)
     val isMySetsExpanded: StateFlow<Boolean> = _isMySetsExpanded.asStateFlow()
 
-    private val _isPublicSetsExpanded = MutableStateFlow(true) // За замовчуванням розгорнуто
+    private val _isPublicSetsExpanded = MutableStateFlow(true)
     val isPublicSetsExpanded: StateFlow<Boolean> = _isPublicSetsExpanded.asStateFlow()
 
     private var setToDeleteId: String? = null
@@ -128,7 +128,7 @@ class SetsViewModel(
                 }
             )
             _isLoadingMySets.value = false
-            setToDeleteId = null // Скидаємо
+            setToDeleteId = null
             setToDeleteName = null
         }
     }
@@ -144,4 +144,3 @@ class SetsViewModel(
         _errorMessage.value = null
     }
 }
-

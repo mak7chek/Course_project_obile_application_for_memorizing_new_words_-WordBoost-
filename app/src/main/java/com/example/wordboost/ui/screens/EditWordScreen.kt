@@ -70,7 +70,7 @@ fun EditWordScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (word == null) "Завантаження..." else "Редагувати слово") }, // Заголовок
+                title = { Text(if (word == null) "Завантаження..." else "Редагувати слово") },
                 navigationIcon = {
                     IconButton(onClick = onBack, enabled = !isLoading) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
@@ -122,8 +122,7 @@ fun EditWordScreen(
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     Button(
-                        onClick = { viewModel.saveWord() }, // Викликаємо збереження
-                        // Кнопка активна, якщо не завантажуємо/зберігаємо І поля тексту/перекладу не порожні
+                        onClick = { viewModel.saveWord() },
                         enabled = !isLoading && editedText.isNotBlank() && editedTranslation.isNotBlank()
                     ) {
                         Text("Зберегти")

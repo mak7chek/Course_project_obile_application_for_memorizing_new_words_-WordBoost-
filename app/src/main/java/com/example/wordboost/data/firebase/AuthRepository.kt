@@ -18,21 +18,16 @@ class AuthRepository {
         auth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    // Реєстрація успішна, тепер намагаємось надіслати лист верифікації
                     sendEmailVerification { sendSuccess, sendMsg ->
                         if (sendSuccess) {
-                            // Повідомляємо про успішну реєстрацію та надсилання листа
                             onResult(true, "Реєстрація успішна. Будь ласка, підтвердьте ваш email. Лист надіслано.")
                         } else {
-                            // Повідомляємо про успішну реєстрацію, але невдале надсилання листа
                             onResult(true, "Реєстрація успішна, але не вдалося надіслати лист верифікації: $sendMsg")
                         }
                     }
                 } else {
-                    // Реєстрація провалилася, обробляємо помилки
                     val errorMessage = when (task.exception) {
                         is FirebaseAuthUserCollisionException -> "Користувач з таким email вже існує."
-                        // Можна додати інші типи помилок реєстрації, якщо потрібно
                         else -> task.exception?.localizedMessage ?: "Помилка реєстрації."
                     }
                     onResult(false, errorMessage)
@@ -74,10 +69,8 @@ class AuthRepository {
         if (user != null) {
             user.reload().addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    // Після перезавантаження, перевіряємо статус верифікації
                     onResult(user.isEmailVerified, null)
                 } else {
-                    // Помилка перезавантаження даних користувача
                     onResult(false, "Не вдалося оновити статус верифікації: ${task.exception?.localizedMessage}")
                 }
             }

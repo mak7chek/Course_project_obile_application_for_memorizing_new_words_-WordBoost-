@@ -17,7 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController // NavController тут потрібен для внутрішньої навігації, якщо буде
+import androidx.navigation.NavController
 import com.example.wordboost.viewmodel.WordListViewModel
 import com.example.wordboost.viewmodel.WordListViewModelFactory
 
@@ -65,17 +65,16 @@ fun AuthenticatedMainScreen(
                             )
                         )
                     )
-                    .padding(horizontal = 16.dp), // Горизонтальний паддінг для всього контенту
+                    .padding(horizontal = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(16.dp)) // Відступ зверху від TopAppBar
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
                     text = "Вітаємо у WordBoost!",
                     style = MaterialTheme.typography.headlineMedium,
-                    // Відступ знизу буде керуватися Arrangement.spacedBy або наступним Spacer
                     color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(bottom = 8.dp) // Зменшений відступ знизу
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
 
                 Row(
@@ -107,20 +106,18 @@ fun AuthenticatedMainScreen(
                 Spacer(modifier = Modifier.height(80.dp))
             }
 
-            // Розміщення FAB та кнопки "Мій словник" внизу екрану
-            // Цей Box буде поверх Column з основним контентом
+
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter) // Притискаємо до низу по центру Box від Scaffold
-                    .padding(bottom = 16.dp) // Відступ від краю екрану або нижньої навігації
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 16.dp)
                     .padding(horizontal = 16.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween, // Розносимо по краях
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Кнопка "Мій словник" - тепер зліва
                     TextButton(
                         onClick = onNavigateToWordList,
                     ) {
@@ -133,7 +130,6 @@ fun AuthenticatedMainScreen(
                         Text("Мій словник", style = MaterialTheme.typography.titleMedium)
                     }
 
-                    // FAB "Додати слово" - тепер справа
                     FloatingActionButton(
                         onClick = onNavigateToTranslate,
                         elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
@@ -146,7 +142,6 @@ fun AuthenticatedMainScreen(
     }
 }
 
-// StatisticCard залишається без змін
 @Composable
 fun StatisticCard(
     modifier: Modifier = Modifier,

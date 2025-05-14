@@ -8,7 +8,6 @@ data class Word(
     val text: String = "",
     val translation: String = "",
     val dictionaryId: String? = null,
-    // SM‑2 fields:
     val repetition: Int = 0,
     val easiness: Float = 2.5f,
     val interval: Long = 0L,

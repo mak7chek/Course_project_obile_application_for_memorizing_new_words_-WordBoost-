@@ -11,7 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.example.wordboost.data.model.SharedSetWordItem // Використовуємо SharedSetWordItem
+import com.example.wordboost.data.model.SharedSetWordItem
 
 @Composable
 fun TemporaryWordListItem(
@@ -35,7 +35,7 @@ fun TemporaryWordListItem(
             Text(wordItem.originalText, style = MaterialTheme.typography.titleMedium)
             Text(wordItem.translationText, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Row { // Кнопки дій
+        Row {
             IconButton(onClick = onEdit, enabled = !isBeingEdited) {
                 Icon(Icons.Default.Edit, contentDescription = "Редагувати слово")
             }

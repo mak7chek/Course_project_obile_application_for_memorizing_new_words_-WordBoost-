@@ -1,8 +1,10 @@
 package com.example.wordboost.viewmodel
+
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wordboost.data.firebase.*
+import com.example.wordboost.data.repository.TranslationRepository
 import com.example.wordboost.data.model.Group
 import com.example.wordboost.data.model.Word
 import com.example.wordboost.data.util.PracticeUtils
@@ -37,9 +39,8 @@ class WordListViewModel(
     private val _searchQuery = MutableStateFlow<String>("")
     private val _selectedGroupIdFilter = MutableStateFlow<String?>(null)
 
-    // !!! displayedWords ТЕПЕР БЕЗПЕЧНО ВИКОРИСТОВУЄ combine !!!
     val displayedWords: StateFlow<List<WordDisplayItem>> = combine(
-        _allWords, // <<< Тепер оголошено вище
+        _allWords,
         searchQuery,
         selectedGroupIdFilter,
         _groups
@@ -68,31 +69,31 @@ class WordListViewModel(
     val wordsToLearnNowCount: StateFlow<Int> = _allWords.map { words ->
         val currentTime = System.currentTimeMillis()
         val count = words.count { it.nextReview <= currentTime && it.status != "mastered" }
-        Log.d("WordListVM_Counts", "wordsToLearnNowCount: allWords.size=${words.size}, dueCount=$count") // Додай логування
+        Log.d("WordListVM_Counts", "wordsToLearnNowCount: allWords.size=${words.size}, dueCount=$count")
         count
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000L), // Змінено з Lazily
+        started = SharingStarted.WhileSubscribed(5000L),
         initialValue = 0
     )
 
     val wordsInShortTermMemoryCount: StateFlow<Int> = _allWords.map { words ->
         val currentTime = System.currentTimeMillis()
         val count = words.count { it.nextReview > currentTime && it.status != "mastered" && it.repetition > 0 }
-        Log.d("WordListVM_Counts", "wordsInShortTermMemoryCount: allWords.size=${words.size}, count=$count") // Додай логування
+        Log.d("WordListVM_Counts", "wordsInShortTermMemoryCount: allWords.size=${words.size}, count=$count")
         count
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000L), // Змінено з Lazily
+        started = SharingStarted.WhileSubscribed(5000L),
         initialValue = 0
     )
     val learnedWordsCount: StateFlow<Int> = _allWords.map { words ->
         val count = words.count { it.status == "mastered" }
-        Log.d("WordListVM_Counts", "learnedWordsCount: allWords.size=${words.size}, count=$count") // Додай логування
+        Log.d("WordListVM_Counts", "learnedWordsCount: allWords.size=${words.size}, count=$count")
         count
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000L), // Змінено з Lazily
+        started = SharingStarted.WhileSubscribed(5000L),
         initialValue = 0
     )
 
@@ -231,15 +232,12 @@ class WordListViewModel(
 
         val parts = mutableListOf<String>()
 
-        // Додаємо дні, якщо вони є
         if (days > 0L) {
             parts.add("$days ${getDaysString(days)}")
         }
-        // Додаємо години, якщо вони є
         if (hours > 0L) {
             parts.add("$hours ${getHoursString(hours)}")
         }
-        // Додаємо хвилини, якщо вони є
         if (minutes > 0L) {
             parts.add("$minutes ${getMinutesString(minutes)}")
         }

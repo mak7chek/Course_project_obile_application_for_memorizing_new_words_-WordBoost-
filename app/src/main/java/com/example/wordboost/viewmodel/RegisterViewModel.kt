@@ -1,4 +1,5 @@
 package com.example.wordboost.viewmodel
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wordboost.data.firebase.AuthRepository
@@ -15,7 +16,6 @@ sealed class RegistrationEvent {
 
 class RegisterViewModel(private val authRepository: AuthRepository) : ViewModel() {
 
-    // Стан, який UI спостерігатиме
     private val _email = MutableStateFlow("")
     val email: StateFlow<String> = _email.asStateFlow()
 

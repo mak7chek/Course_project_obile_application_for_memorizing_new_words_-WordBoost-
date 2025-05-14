@@ -1,4 +1,4 @@
-package com.example.wordboost.ui.components // Ваш пакет
+package com.example.wordboost.ui.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,7 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.wordboost.data.model.Group // Переконайтесь в імпорті Group
+import com.example.wordboost.data.model.Group
 
 @Composable
 fun GroupFilterDropdown(
@@ -26,14 +26,13 @@ fun GroupFilterDropdown(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp) // Горизонтальний та вертикальний відступ
+            .padding(horizontal = 16.dp, vertical = 4.dp)
             .clickable { expanded = true },
         contentAlignment = Alignment.CenterStart
     ) {
         OutlinedButton(
             onClick = { expanded = true },
-            // !!! ЗМІНЕНО: Заповнюємо тільки ШИРИНУ батьківського Box !!!
-            modifier = Modifier.fillMaxWidth(), // Кнопка заповнює ШИРИНУ Box
+            modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(horizontal = 16.dp),
             shape = MaterialTheme.shapes.medium
         ) {

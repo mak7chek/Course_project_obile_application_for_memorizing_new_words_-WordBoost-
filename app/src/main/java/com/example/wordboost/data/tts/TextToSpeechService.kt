@@ -11,12 +11,10 @@ class TextToSpeechService(context: Context) : TextToSpeech.OnInitListener {
     private var tts: TextToSpeech? = null
     private var isTtsReady = false
 
-    // !!! Мова для озвучення - АНГЛІЙСЬКА !!!
-    private val desiredLocale: Locale = Locale.ENGLISH // !!! Встановлюємо англійську !!!
+    private val desiredLocale: Locale = Locale.ENGLISH
 
 
     init {
-        // Ініціалізуємо TextToSpeech двигун
         Log.d("TTS", "Initializing TTS engine.")
         tts = TextToSpeech(context, this)
     }
@@ -24,22 +22,17 @@ class TextToSpeechService(context: Context) : TextToSpeech.OnInitListener {
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             Log.d("TTS", "TTS engine initialized successfully.")
-            // !!! Спробуємо встановити бажану мову (англійську) !!!
             val result = tts?.setLanguage(desiredLocale)
 
             if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                 Log.e("TTS", "Мова $desiredLocale не підтримується TTS двигуном або відсутні дані.")
-                isTtsReady = false // TTS не готовий, якщо мова не підтримується
+                isTtsReady = false
             } else {
                 isTtsReady = true
-                Log.d("TTS", "TTS двигун готовий. Мова встановлена на $desiredLocale.")
             }
         } else {
-            Log.e("TTS", "Помилка ініціалізації TTS двигуна. Код помилки: $status")
-            isTtsReady = false // TTS не готовий при помилці ініціалізації
+            isTtsReady = false
         }
-
-        // Налаштовуємо слухача для відстеження завершення озвучення (не обов'язково для цієї проблеми, але корисно)
         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
                 Log.d("TTS", "Початок озвучення: $utteranceId")
@@ -62,36 +55,32 @@ class TextToSpeechService(context: Context) : TextToSpeech.OnInitListener {
 
     fun speak(text: String) {
         if (isTtsReady) {
-            Log.d("TTS", "Спроба озвучити текст: \"$text\"") // Додано лог
-            // Використовуємо QUEUE_FLUSH, щоб зупинити попереднє озвучення і почати нове
-            // UtteranceId можна використовувати для відстеження прогресу, але тут не обов'язково
-            // Додано перевірку на порожній текст перед speak
+            Log.d("TTS", "Спроба озвучити текст: \"$text\"")
             if (text.isNotBlank()) {
-                val result = tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, text) // Використовуємо текст як utteranceId
+                val result = tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, text)
                 if (result == TextToSpeech.ERROR) {
-                    Log.e("TTS", "Помилка виклику speak() для тексту: \"$text\"") // Додано лог
+                    Log.e("TTS", "Помилка виклику speak() для тексту: \"$text\"")
                 }
             } else {
-                Log.w("TTS", "Надано порожній текст для озвучення.") // Додано лог
+                Log.w("TTS", "Надано порожній текст для озвучення.")
             }
         } else {
-            Log.w("TTS", "TTS двигун не готовий або мова не підтримується. Не можу озвучити текст: \"$text\"") // Додано лог
+            Log.w("TTS", "TTS двигун не готовий або мова не підтримується. Не можу озвучити текст: \"$text\"")
         }
     }
 
     fun stop() {
-        // Зупиняємо, тільки якщо TTS ініціалізовано
         if (tts != null) {
             tts?.stop()
-            Log.d("TTS", "TTS зупинено.") // Додано лог
+            Log.d("TTS", "TTS зупинено.")
         }
     }
 
     fun shutdown() {
         tts?.apply {
             stop()
-            shutdown() // Використовуємо shutdown для коректного звільнення ресурсів
-            Log.d("TTS", "TTS вимкнено.") // Додано лог
+            shutdown()
+            Log.d("TTS", "TTS вимкнено.")
         }
         tts = null
         isTtsReady = false
