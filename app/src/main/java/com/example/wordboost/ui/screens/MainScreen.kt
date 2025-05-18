@@ -27,6 +27,9 @@ import com.example.wordboost.viewmodel.SetsViewModelFactory
 import com.example.wordboost.ui.screens.createset.CreateSetScreen
 import com.example.wordboost.viewmodel.BrowseSharedSetViewModel
 import com.example.wordboost.viewmodel.BrowseSetViewModelFactory
+import com.example.wordboost.viewmodel.ArticleViewModel
+import com.example.wordboost.viewmodel.ArticleViewModelFactory
+import com.example.wordboost.ui.screens.articles.CreateEditArticleScreen
 
 enum class TopLevelScreenState {
     Loading,
@@ -37,7 +40,10 @@ enum class TopLevelScreenState {
     WordListFullScreen,
     EditWordFullScreen,
     CreateSetWizardFullScreen,
-    BrowseSharedSetFullScreen
+    BrowseSharedSetFullScreen,
+    ArticlesListFullScreen,
+    ViewArticleFullScreen,
+    CreateEditArticleFullScreen
 }
 
 enum class AuthSubState {
@@ -58,13 +64,22 @@ fun MainScreen(
     var currentSetIdForBrowse by remember { mutableStateOf<String?>(null) }
     var editingSetId by remember { mutableStateOf<String?>(null) }
 
+    var viewingArticleId by remember { mutableStateOf<String?>(null) }
+    var editingArticleId by remember { mutableStateOf<String?>(null) }
 
     val practiceViewModelFactory = remember(practiceRepo, ttsService, authRepo) { PracticeViewModelFactory(repository = practiceRepo, ttsService = ttsService, authRepository = authRepo) }
     val wordListViewModelFactory = remember(firebaseRepo, authRepo, ttsService) { WordListViewModelFactory(repository = firebaseRepo, authRepository = authRepo, ttsService = ttsService) }
     val editWordViewModelFactoryBuilder = remember(firebaseRepo) { { wordId: String? -> EditWordViewModelFactory(repository = firebaseRepo, wordId = wordId) } }
     val createSetViewModelFactory = remember(firebaseRepo, translationRepo, authRepo) { CreateSetViewModelFactory(firebaseRepository = firebaseRepo, translationRepository = translationRepo, authRepository = authRepo) }
     val setsViewModelFactory = remember(firebaseRepo, authRepo) { SetsViewModelFactory(firebaseRepository = firebaseRepo, authRepository = authRepo) }
-
+    val articleViewModelFactory = remember(firebaseRepo, translationRepo, ttsService, authRepo) {
+        ArticleViewModelFactory(
+            firebaseRepository = firebaseRepo,
+            translationRepository = translationRepo,
+            ttsService = ttsService,
+            authRepository = authRepo
+        )
+    }
     LaunchedEffect(key1 = authRepo) {
         Log.d("MainScreen", "Auth state listener collection started.")
         authRepo.getAuthState().collect { user ->
@@ -140,7 +155,88 @@ fun MainScreen(
                         currentTopLevelScreenState = TopLevelScreenState.CreateSetWizardFullScreen
                     },
                     wordListViewModelFactory = wordListViewModelFactory,
-                    setsViewModelFactory = setsViewModelFactory
+                    setsViewModelFactory = setsViewModelFactory,
+                    articleViewModelFactory = articleViewModelFactory,
+                    // onNavigateToArticlesList ПРИБРАНО ЗВІДСИ
+                    onNavigateToViewArticle = { articleId ->
+                        viewingArticleId = articleId
+                        currentTopLevelScreenState = TopLevelScreenState.ViewArticleFullScreen
+                    },
+                    onNavigateToCreateArticle = {
+                        editingArticleId = null // Створення нової статті
+                        currentTopLevelScreenState = TopLevelScreenState.CreateEditArticleFullScreen
+                    },
+                    onNavigateToEditArticle = { articleId ->
+                        editingArticleId = articleId // Редагування існуючої
+                        currentTopLevelScreenState = TopLevelScreenState.CreateEditArticleFullScreen
+                    }
+                )
+            }
+            TopLevelScreenState.ArticlesListFullScreen -> {
+                val articleViewModel: ArticleViewModel = viewModel(factory = articleViewModelFactory)
+                // Заміни Text на твій ArticlesListScreen
+                /*
+                ArticlesListScreen(
+                    viewModel = articleViewModel,
+                    onViewArticle = { articleId ->
+                        viewingArticleId = articleId
+                        currentTopLevelScreenState = TopLevelScreenState.ViewArticleFullScreen
+                    },
+                    onCreateArticle = {
+                        editingArticleId = null
+                        currentTopLevelScreenState = TopLevelScreenState.CreateEditArticleFullScreen
+                    },
+                    onEditArticle = { articleId ->
+                        editingArticleId = articleId
+                        currentTopLevelScreenState = TopLevelScreenState.CreateEditArticleFullScreen
+                    },
+                    onBack = { currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp }
+                )
+                */
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("ArticlesListScreen Placeholder (Повернення на Головний екран через 5с)")
+                }
+                LaunchedEffect(Unit){ kotlinx.coroutines.delay(5000); if(currentTopLevelScreenState == TopLevelScreenState.ArticlesListFullScreen) currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp }
+            }
+            TopLevelScreenState.ViewArticleFullScreen -> {
+                viewingArticleId?.let { articleId ->
+                    val articleViewModel: ArticleViewModel = viewModel(key = "ViewArticle_$articleId", factory = articleViewModelFactory)
+                    // Заміни Text на твій ViewArticleScreen
+                    /*
+                    ViewArticleScreen(
+                        articleId = articleId,
+                        viewModel = articleViewModel,
+                        onBack = {
+                            viewingArticleId = null
+                            currentTopLevelScreenState = TopLevelScreenState.ArticlesListFullScreen
+                        }
+                    )
+                    */
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("ViewArticleScreen Placeholder for $articleId (Повернення до списку через 5с)")
+                    }
+                    LaunchedEffect(Unit){ kotlinx.coroutines.delay(5000); if(currentTopLevelScreenState == TopLevelScreenState.ViewArticleFullScreen) currentTopLevelScreenState = TopLevelScreenState.ArticlesListFullScreen }
+                } ?: LaunchedEffect(Unit) { currentTopLevelScreenState = TopLevelScreenState.ArticlesListFullScreen }
+            }
+            TopLevelScreenState.CreateEditArticleFullScreen -> {
+                Log.d("MainScreen", "Showing CreateEditArticleFullScreen for articleId: $editingArticleId")
+                val articleViewModel: ArticleViewModel = viewModel(
+                    key = editingArticleId ?: "CreateArticle", // Унікальний ключ
+                    factory = articleViewModelFactory
+                )
+                CreateEditArticleScreen( // Виклик твого нового екрану
+                    editingArticleId = editingArticleId,
+                    viewModel = articleViewModel,
+                    onSaveSuccess = {
+                        Log.d("MainScreen", "Save success for article, navigating back to ArticlesList.")
+                        editingArticleId = null // Скидаємо ID після збереження
+                        currentTopLevelScreenState = TopLevelScreenState.ArticlesListFullScreen // Або AuthenticatedApp, залежно від логіки
+                    },
+                    onBack = {
+                        Log.d("MainScreen", "Back from CreateEditArticle, navigating back to ArticlesList.")
+                        editingArticleId = null
+                        currentTopLevelScreenState = TopLevelScreenState.ArticlesListFullScreen // Або AuthenticatedApp
+                    }
                 )
             }
             TopLevelScreenState.TranslateWordFullScreen -> {

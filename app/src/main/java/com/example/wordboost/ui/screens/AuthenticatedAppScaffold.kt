@@ -34,13 +34,15 @@ import com.example.wordboost.viewmodel.ArticleViewModel
 import com.example.wordboost.viewmodel.ArticleViewModelFactory
 import com.example.wordboost.viewmodel.WordListViewModelFactory
 import kotlinx.coroutines.launch
-
+import androidx.navigation.compose.NavHost // Потрібні для NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.ViewModel
-
+import com.example.wordboost.ui.screens.articles.ArticlesListScreen
 @Composable
 fun SectionHeader(
     title: String,
@@ -249,6 +251,7 @@ fun SetsScreen(
     }
 }
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthenticatedAppScaffold(
@@ -260,9 +263,13 @@ fun AuthenticatedAppScaffold(
     onNavigateToBrowseSet: (String) -> Unit,
     onNavigateToEditSet: (String) -> Unit,
     setsViewModelFactory: SetsViewModelFactory,
-    wordListViewModelFactory: WordListViewModelFactory
+    wordListViewModelFactory: WordListViewModelFactory,
+    articleViewModelFactory: ArticleViewModelFactory,
+    onNavigateToViewArticle: (articleId: String) -> Unit,
+    onNavigateToCreateArticle: () -> Unit,
+    onNavigateToEditArticle: (articleId: String) -> Unit
 ) {
-    val navController = rememberNavController()
+    val navController: NavHostController = rememberNavController()
 
     Scaffold(
         bottomBar = { MyBottomNavigationBar(navController = navController) }
@@ -273,8 +280,9 @@ fun AuthenticatedAppScaffold(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Home.route) {
+                // Твій AuthenticatedMainScreen, який ти надав
                 AuthenticatedMainScreen(
-                    navController = navController,
+                    navController = navController, // Передаємо, якщо AuthenticatedMainScreen має власну логіку навігації
                     onNavigateToTranslate = onNavigateToTranslate,
                     onNavigateToPractice = onNavigateToPractice,
                     onNavigateToWordList = onNavigateToWordList,
@@ -284,7 +292,7 @@ fun AuthenticatedAppScaffold(
             }
             composable(BottomNavItem.Sets.route) {
                 val viewModel: SetsViewModel = viewModel(factory = setsViewModelFactory)
-                SetsScreen(
+                SetsScreen( // Ти вже надав цей код
                     viewModel = viewModel,
                     onNavigateToCreateSet = onNavigateToCreateSet,
                     onNavigateToViewPublicSet = { setId -> onNavigateToBrowseSet(setId) },
@@ -293,14 +301,16 @@ fun AuthenticatedAppScaffold(
                 )
             }
             composable(BottomNavItem.Articles.route) {
-                val viewModel: ArticleViewModel = viewModel(factory = setsViewModelFactory)
-                ArticlesScreen(
-                    viewModel = viewModel,
-                    onNavigateToCreateSet = onNavigateToCreateSet,
-                    onNavigateToViewPublicSet = { setId -> onNavigateToBrowseSet(setId) },
-                    onNavigateToBrowseMySet = { setId -> onNavigateToBrowseSet(setId) },
-                    onNavigateToEditSet = { setId -> onNavigateToEditSet(setId) }
-                )
+                    val articleViewModel: ArticleViewModel = viewModel(factory = articleViewModelFactory)
+                    ArticlesListScreen( // Розкоментуй та підключи
+                        viewModel = articleViewModel,
+                        onViewArticle = onNavigateToViewArticle,
+                        onCreateArticle = onNavigateToCreateArticle,
+                        onEditArticle = onNavigateToEditArticle
+                    )
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("ArticlesListScreen (Section) Placeholder") // Тимчасова заглушка
+                }
             }
         }
     }

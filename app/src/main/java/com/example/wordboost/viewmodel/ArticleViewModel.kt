@@ -1,36 +1,48 @@
-package com.example.wordboost.viewmodel // Або твій пакет для ViewModel
+package com.example.wordboost.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.wordboost.data.model.Article // Твої моделі
-import com.example.wordboost.data.model.ArticleUiModel
-import com.example.wordboost.data.repository.ArticleRepository // Твій репозиторій
+import com.example.wordboost.data.model.Article
+import com.example.wordboost.data.firebase.FirebaseRepository
+import com.example.wordboost.data.firebase.AuthRepository
+import com.example.wordboost.data.model.UserArticleInteraction // Додай, якщо ще не додав
 import com.example.wordboost.data.repository.TranslationRepository
 import com.example.wordboost.data.tts.TextToSpeechService
-import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue // Важливий імпорт
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.util.Date
+
+data class ArticleUiModel(
+    val article: Article,
+    val isRead: Boolean,
+    val isCurrentUserOwner: Boolean
+)
+
+enum class SaveArticleStatus {
+    Idle,    // Немає операції
+    Saving,  // Іде збереження
+    Success, // Успішно збережено
+    Error    // Сталася помилка
+}
 
 class ArticleViewModel(
-    private val articleRepository: ArticleRepository,
-    private val translationRepository: TranslationRepository, // Твій репозиторій перекладів
-    private val ttsService: TextToSpeechService, // Твій TTS сервіс
-    private val firebaseAuth: FirebaseAuth // Для отримання ID поточного користувача
+    private val firebaseRepository: FirebaseRepository,
+    private val translationRepository: TranslationRepository,
+    private val ttsService: TextToSpeechService,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
-    private val currentUserId: String?
-        get() = firebaseAuth.currentUser?.uid
+    private val currentUserIdInternal: String?
+        get() = authRepository.getCurrentUser()?.uid
 
-    // --- StateFlows для списків статей ---
+    // --- StateFlows для UI ---
     private val _userArticles = MutableStateFlow<List<ArticleUiModel>>(emptyList())
     val userArticles: StateFlow<List<ArticleUiModel>> = _userArticles.asStateFlow()
 
     private val _publishedArticles = MutableStateFlow<List<ArticleUiModel>>(emptyList())
     val publishedArticles: StateFlow<List<ArticleUiModel>> = _publishedArticles.asStateFlow()
 
-    // --- Стани завантаження та помилок ---
     private val _isLoadingUserArticles = MutableStateFlow(false)
     val isLoadingUserArticles: StateFlow<Boolean> = _isLoadingUserArticles.asStateFlow()
 
@@ -40,152 +52,372 @@ class ArticleViewModel(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    // --- Стан для поточного перегляду статті ---
     private val _currentViewingArticle = MutableStateFlow<Article?>(null)
     val currentViewingArticle: StateFlow<Article?> = _currentViewingArticle.asStateFlow()
 
-    // --- Стан для перекладу ---
     private val _translatedText = MutableStateFlow<String?>(null)
     val translatedText: StateFlow<String?> = _translatedText.asStateFlow()
 
     private val _isTranslationDialogVisible = MutableStateFlow(false)
     val isTranslationDialogVisible: StateFlow<Boolean> = _isTranslationDialogVisible.asStateFlow()
 
-    // --- Стани розгорнутих секцій (як у SetsViewModel) ---
     private val _isUserArticlesExpanded = MutableStateFlow(true)
     val isUserArticlesExpanded: StateFlow<Boolean> = _isUserArticlesExpanded.asStateFlow()
 
     private val _isPublishedArticlesExpanded = MutableStateFlow(true)
     val isPublishedArticlesExpanded: StateFlow<Boolean> = _isPublishedArticlesExpanded.asStateFlow()
 
+    // --- Для діалогу видалення ---
+    private val _showDeleteArticleConfirmDialog = MutableStateFlow(false)
+    val showDeleteArticleConfirmDialog: StateFlow<Boolean> =
+        _showDeleteArticleConfirmDialog.asStateFlow()
+
+    private var articleIdToDelete: String? = null
+    private var articleTitleToDelete: String? = null
+
+    // --- Для статусу збереження статті ---
+    private val _saveArticleStatus = MutableStateFlow<SaveArticleStatus>(SaveArticleStatus.Idle)
+    val saveArticleStatus: StateFlow<SaveArticleStatus> = _saveArticleStatus.asStateFlow()
 
     init {
-        loadUserArticles()
-        loadPublishedArticles()
+        Log.d("ArticleViewModel", "ViewModel initialized. CurrentUser ID: $currentUserIdInternal")
+        if (currentUserIdInternal != null) {
+            loadUserArticles()
+            loadPublishedArticles()
+        } else {
+            Log.w(
+                "ArticleViewModel",
+                "User not logged in at ViewModel init. Articles will not be loaded."
+            )
+            _userArticles.value = emptyList()
+            _publishedArticles.value = emptyList()
+        }
     }
 
     fun loadUserArticles() {
-        currentUserId?.let { userId ->
+        currentUserIdInternal?.let { userId ->
             viewModelScope.launch {
                 _isLoadingUserArticles.value = true
-                articleRepository.getUserArticlesWithReadStatus(userId)
+                Log.d("ArticleViewModel", "Loading user articles for userId: $userId")
+                firebaseRepository.getUserArticlesFlow(userId)
+                    .flatMapLatest { articles ->
+                        if (articles.isEmpty()) {
+                            Log.d("ArticleViewModel", "No user articles found for userId: $userId")
+                            flowOf(emptyList<ArticleUiModel>())
+                        } else {
+                            Log.d(
+                                "ArticleViewModel",
+                                "Found ${articles.size} user articles, fetching interactions for userId: $userId"
+                            )
+                            val uiModelsFlows: List<Flow<ArticleUiModel>> =
+                                articles.map { article ->
+                                    firebaseRepository.getUserArticleInteractionFlow(
+                                        userId,
+                                        article.id
+                                    )
+                                        .map { interaction ->
+                                            ArticleUiModel(
+                                                article = article,
+                                                isRead = interaction?.isRead ?: false,
+                                                isCurrentUserOwner = (article.userId == userId)
+                                            )
+                                        }
+                                }
+                            combine(uiModelsFlows) { it.toList() }
+                        }
+                    }
                     .catch { e ->
+                        Log.e(
+                            "ArticleViewModel",
+                            "Error loading user articles for userId: $userId",
+                            e
+                        )
                         _errorMessage.value = "Помилка завантаження ваших статей: ${e.message}"
+                        _userArticles.value = emptyList()
                         _isLoadingUserArticles.value = false
                     }
-                    .collect { articles ->
-                        _userArticles.value = articles
+                    .collect { articleUiModels ->
+                        _userArticles.value = articleUiModels
                         _isLoadingUserArticles.value = false
+                        Log.d(
+                            "ArticleViewModel",
+                            "User articles updated for userId: $userId. Count: ${articleUiModels.size}"
+                        )
                     }
             }
         } ?: run {
-            _userArticles.value = emptyList() // Якщо користувач не залогінений
+            Log.w(
+                "ArticleViewModel",
+                "loadUserArticles: currentUserId is null. Clearing user articles."
+            )
+            _userArticles.value = emptyList()
             _isLoadingUserArticles.value = false
         }
     }
 
     fun loadPublishedArticles() {
-        currentUserId?.let { userId -> // Потрібен userId для визначення статусу прочитання
-            viewModelScope.launch {
-                _isLoadingPublishedArticles.value = true
-                articleRepository.getPublishedArticlesWithReadStatus(userId)
-                    .catch { e ->
-                        _errorMessage.value = "Помилка завантаження публічних статей: ${e.message}"
-                        _isLoadingPublishedArticles.value = false
+        val localCurrentUserId = currentUserIdInternal
+        viewModelScope.launch {
+            _isLoadingPublishedArticles.value = true
+            Log.d(
+                "ArticleViewModel",
+                "Loading published articles. Current userId for interactions: $localCurrentUserId"
+            )
+            firebaseRepository.getPublishedArticlesFlow(null)
+                .flatMapLatest { articles ->
+                    val articlesNotOwnedByUser = articles.filter { it.userId != localCurrentUserId }
+                    if (articlesNotOwnedByUser.isEmpty()) {
+                        Log.d(
+                            "ArticleViewModel",
+                            "No published articles found (not owned by current user)."
+                        )
+                        flowOf(emptyList<ArticleUiModel>())
+                    } else {
+                        Log.d(
+                            "ArticleViewModel",
+                            "Found ${articlesNotOwnedByUser.size} published articles (not owned by user), fetching interactions."
+                        )
+                        val uiModelsFlows: List<Flow<ArticleUiModel>> =
+                            articlesNotOwnedByUser.map { article ->
+                                val isOwner =
+                                    article.userId == localCurrentUserId // Завжди false для цього відфільтрованого списку
+                                if (localCurrentUserId != null) {
+                                    firebaseRepository.getUserArticleInteractionFlow(
+                                        localCurrentUserId,
+                                        article.id
+                                    )
+                                        .map { interaction ->
+                                            ArticleUiModel(
+                                                article = article,
+                                                isRead = interaction?.isRead ?: false,
+                                                isCurrentUserOwner = isOwner
+                                            )
+                                        }
+                                } else {
+                                    flowOf(
+                                        ArticleUiModel(
+                                            article,
+                                            isRead = false,
+                                            isCurrentUserOwner = false
+                                        )
+                                    )
+                                }
+                            }
+                        combine(uiModelsFlows) { it.toList() }
                     }
-                    .collect { articles ->
-                        _publishedArticles.value = articles
-                        _isLoadingPublishedArticles.value = false
-                    }
-            }
-        } ?: run { // Якщо користувач не залогінений, можна завантажити без статусу прочитання або не завантажувати
-            _publishedArticles.value = emptyList()
-            _isLoadingPublishedArticles.value = false
+                }
+                .catch { e ->
+                    Log.e("ArticleViewModel", "Error loading published articles", e)
+                    _errorMessage.value = "Помилка завантаження публічних статей: ${e.message}"
+                    _publishedArticles.value = emptyList()
+                    _isLoadingPublishedArticles.value = false
+                }
+                .collect { articleUiModels ->
+                    _publishedArticles.value = articleUiModels
+                    _isLoadingPublishedArticles.value = false
+                    Log.d(
+                        "ArticleViewModel",
+                        "Published articles updated. Count: ${articleUiModels.size}"
+                    )
+                }
         }
     }
 
     fun loadArticleContent(articleId: String) {
         viewModelScope.launch {
-            // Опціонально: показати індикатор завантаження контенту статті
-            articleRepository.getArticleById(articleId)
-                .catch { e -> _errorMessage.value = "Помилка завантаження статті: ${e.message}" }
+            Log.d("ArticleViewModel", "Loading content for articleId: $articleId")
+            firebaseRepository.getArticleByIdFlow(articleId)
+                .catch { e ->
+                    _errorMessage.value = "Помилка завантаження статті: ${e.message}"
+                    Log.e("ArticleViewModel", "Error loading article $articleId content", e)
+                    // _isLoadingCurrentArticle.value = false
+                }
                 .collect { article ->
                     _currentViewingArticle.value = article
-                    // Позначити статтю як прочитану, якщо вона завантажена успішно
+                    // _isLoadingCurrentArticle.value = false
                     if (article != null) {
-                        currentUserId?.let { userId ->
-                            articleRepository.markArticleAsRead(userId, articleId)
-                                .onFailure { e -> _errorMessage.value = "Не вдалося позначити статтю як прочитану: ${e.message}" }
+                        Log.d(
+                            "ArticleViewModel",
+                            "Article $articleId content loaded: ${article.title}"
+                        )
+                        currentUserIdInternal?.let { userId ->
+                            launch {
+                                Log.d(
+                                    "ArticleViewModel",
+                                    "Marking article $articleId as read for userId: $userId"
+                                )
+                                firebaseRepository.markArticleInteraction(
+                                    userId,
+                                    articleId,
+                                    isRead = true
+                                )
+                                    .onFailure { e ->
+                                        _errorMessage.value =
+                                            "Не вдалося позначити статтю як прочитану: ${e.message}"
+                                        Log.e(
+                                            "ArticleViewModel",
+                                            "Error marking article $articleId as read",
+                                            e
+                                        )
+                                    }
+                                    .onSuccess {
+                                        Log.d(
+                                            "ArticleViewModel",
+                                            "Article $articleId marked as read successfully for userId: $userId"
+                                        )
+                                        _userArticles.update { list ->
+                                            list.map {
+                                                if (it.article.id == articleId) it.copy(
+                                                    isRead = true
+                                                ) else it
+                                            }
+                                        }
+                                        _publishedArticles.update { list ->
+                                            list.map {
+                                                if (it.article.id == articleId) it.copy(
+                                                    isRead = true
+                                                ) else it
+                                            }
+                                        }
+                                    }
+                            }
                         }
+                    } else {
+                        _errorMessage.value = "Не вдалося завантажити статтю."
+                        Log.w(
+                            "ArticleViewModel",
+                            "Article $articleId content is null after loading."
+                        )
                     }
                 }
         }
     }
 
     fun createOrUpdateArticle(
-        id: String? = null, // null для створення нової статті
+        id: String? = null,
         title: String,
         content: String,
-        isPublished: Boolean
-        // languageCode можна поки що жорстко задати "en"
+        published: Boolean
     ) {
-        currentUserId?.let { userId ->
-            viewModelScope.launch {
-                val article = Article(
-                    id = id ?: "", // Firebase згенерує ID, якщо id порожній при створенні
-                    userId = userId,
-                    authorName = firebaseAuth.currentUser?.displayName, // Або інше ім'я автора
-                    title = title.trim(),
-                    content = content.trim(),
-                    languageCode = "en", // Поки що англійська
-                    createdAt = if (id == null) Date() else null, // Встановлюємо тільки при створенні, Firebase оновить через @ServerTimestamp
-                    updatedAt = Date(), // Firebase оновить через @ServerTimestamp
-                    isPublished = isPublished
-                )
+        val localCurrentUserId = currentUserIdInternal
+        val userDisplayName = authRepository.getCurrentUser()?.displayName
 
-                val result = if (id == null) {
-                    articleRepository.addArticle(article.copy(createdAt = null, updatedAt = null)) // Firebase встановить timestamps
-                } else {
-                    // При оновленні, ми передаємо тільки ті поля, які змінилися, або весь об'єкт.
-                    // createdAt не оновлюємо. updatedAt оновиться автоматично.
-                    val updates = mapOf(
-                        "title" to article.title,
-                        "content" to article.content,
-                        "isPublished" to article.isPublished,
-                        "updatedAt" to FieldValue.serverTimestamp() // Явно просимо оновити час
-                    )
-                    articleRepository.updateArticle(id, updates).map { id } // map Result<Unit> to Result<String>
-                }
-
-                result.onSuccess { articleId ->
-                    // Можна оновити списки або показати повідомлення
-                    loadUserArticles() // Оновити список моїх статей
-                    if (isPublished) loadPublishedArticles() // Якщо опубліковано, оновити і публічні
-                }.onFailure { e ->
-                    _errorMessage.value = "Помилка збереження статті: ${e.message}"
-                }
-            }
-        } ?: run {
+        if (localCurrentUserId == null) {
             _errorMessage.value = "Будь ласка, увійдіть, щоб зберегти статтю."
+            Log.w("ArticleViewModel", "User not logged in. Cannot save article.")
+            _saveArticleStatus.value = SaveArticleStatus.Error
+            return
         }
+        if (title.isBlank() || content.isBlank()) {
+            _errorMessage.value = "Заголовок та текст статті не можуть бути порожніми."
+            Log.w("ArticleViewModel", "Title or content is blank.")
+            _saveArticleStatus.value = SaveArticleStatus.Error
+            return
+        }
+
+
+        _saveArticleStatus.value = SaveArticleStatus.Saving
+        viewModelScope.launch {
+            val articleData = Article(
+                id = id ?: "",
+                userId = localCurrentUserId,
+                authorName = userDisplayName,
+                title = title.trim(),
+                content = content.trim(),
+                languageCode = "en",
+                createdAt = if (id == null) null else _currentViewingArticle.value?.createdAt,
+                updatedAt = null,
+                published = published
+            )
+
+            val result: Result<String?> = if (id == null) { // Створення нової статті
+                firebaseRepository.addArticle(articleData) // Повертає Result<String> з ID нової статті
+            } else { // Оновлення існуючої
+                val updates = mutableMapOf<String, Any>(
+                    "title" to articleData.title,
+                    "content" to articleData.content,
+                    "published" to articleData.published,
+                    "languageCode" to articleData.languageCode,
+                    "updatedAt" to FieldValue.serverTimestamp() // Завжди оновлюємо час
+                )
+                firebaseRepository.updateArticle(id, updates)
+                    .map { id } // Перетворюємо Result<Unit> на Result<String?>
+            }
+
+            result.onSuccess { newOrUpdatedId -> // newOrUpdatedId може бути null при оновленні, якщо updateArticle не повертає ID
+                Log.i("ArticleViewModel", "Article save success. ID: ${newOrUpdatedId ?: id}")
+                _saveArticleStatus.value = SaveArticleStatus.Success
+                loadUserArticles()
+                if (published || (id != null && _publishedArticles.value.any { it.article.id == id })) {
+                    loadPublishedArticles()
+                }
+            }.onFailure { e ->
+                Log.e("ArticleViewModel", "Error saving article (id: $id)", e)
+                _errorMessage.value = "Помилка збереження статті: ${e.message}"
+                _saveArticleStatus.value = SaveArticleStatus.Error
+            }
+        }
+    }
+
+    fun resetSaveArticleStatus() {
+        _saveArticleStatus.value = SaveArticleStatus.Idle
+    }
+
+    fun clearCurrentViewingArticle() {
+        _currentViewingArticle.value = null
+        Log.d("ArticleViewModel", "Cleared current viewing article.")
     }
 
 
     fun deleteArticle(articleId: String) {
         viewModelScope.launch {
-            articleRepository.deleteArticle(articleId)
+            Log.d("ArticleViewModel", "Attempting to delete article: $articleId")
+            firebaseRepository.deleteArticle(articleId)
                 .onSuccess {
-                    // Оновити списки, прибрати _currentViewingArticle якщо це видалена стаття
+                    Log.i("ArticleViewModel", "Article $articleId deleted successfully.")
                     if (_currentViewingArticle.value?.id == articleId) {
                         _currentViewingArticle.value = null
                     }
+                    // Списки оновляться через Firestore listeners, але для миттєвого ефекту можна:
                     loadUserArticles()
                     loadPublishedArticles()
                 }
                 .onFailure { e ->
+                    Log.e("ArticleViewModel", "Error deleting article $articleId", e)
                     _errorMessage.value = "Помилка видалення статті: ${e.message}"
                 }
         }
+    }
+
+    fun requestDeleteArticle(articleId: String, articleTitle: String) {
+        this.articleIdToDelete = articleId
+        this.articleTitleToDelete = articleTitle
+        _showDeleteArticleConfirmDialog.value = true
+        Log.d(
+            "ArticleViewModel",
+            "Requested delete for articleId: $articleId, title: $articleTitle"
+        )
+    }
+
+    fun confirmDeleteArticle() {
+        Log.d("ArticleViewModel", "Confirming delete for articleId: $articleIdToDelete")
+        articleIdToDelete?.let {
+            deleteArticle(it)
+        }
+        _showDeleteArticleConfirmDialog.value = false
+        articleIdToDelete = null
+        articleTitleToDelete = null
+    }
+
+    fun cancelDeleteArticle() {
+        Log.d("ArticleViewModel", "Cancelled delete for articleId: $articleIdToDelete")
+        _showDeleteArticleConfirmDialog.value = false
+        articleIdToDelete = null
+        articleTitleToDelete = null
+    }
+
+    fun getArticleTitleToDelete(): String? {
+        return articleTitleToDelete
     }
 
     fun translateText(text: String, targetLanguage: String = "uk") {
@@ -195,26 +427,27 @@ class ArticleViewModel(
             return
         }
         viewModelScope.launch {
-            // Тут можна додати індикатор завантаження перекладу
-            val translation = translationRepository.translateForUserVocabularySuspend(text, targetLanguage)
+            Log.d("ArticleViewModel", "Translating text: \"$text\" to $targetLanguage")
+            val translation =
+                translationRepository.translateForUserVocabularySuspend(text, targetLanguage)
             _translatedText.value = translation
-            _isTranslationDialogVisible.value = translation != null // Показати діалог, якщо є переклад
+            _isTranslationDialogVisible.value = translation != null
+            Log.d("ArticleViewModel", "Translation result: \"$translation\"")
         }
     }
 
     fun dismissTranslationDialog() {
         _isTranslationDialogVisible.value = false
-        _translatedText.value = null
+        // _translatedText.value = null // Можна не скидати, якщо потрібно кешувати
     }
 
-    fun speakText(text: String, languageCode: String = "en") { // languageCode для оригіналу
-        // Поки що твій TTS сервіс жорстко налаштований на Locale.ENGLISH
-        // Якщо буде потрібно динамічно, треба буде модифікувати TTS сервіс
+    fun speakText(text: String, languageCode: String = "en") {
+        Log.d("ArticleViewModel", "Speaking text: \"$text\" in language: $languageCode")
         if (languageCode == "en") {
             ttsService.speak(text)
         } else {
-            // Логіка для інших мов, якщо TTS сервіс це підтримує
             _errorMessage.value = "Озвучування для мови '$languageCode' поки не підтримується."
+            Log.w("ArticleViewModel", "TTS for language '$languageCode' not supported yet.")
         }
     }
 
@@ -232,22 +465,6 @@ class ArticleViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        // ttsService.shutdown() // Якщо TTS сервіс має бути живим протягом всього додатку, то shutdown() викликати в Application.onTerminate() або коли життєвий цикл додатку завершується. Якщо він специфічний для ViewModel, то тут.
-    }
-}
-
-// --- Factory для ArticleViewModel ---
-class ArticleViewModelFactory(
-    private val articleRepository: ArticleRepository,
-    private val translationRepository: TranslationRepository,
-    private val ttsService: TextToSpeechService,
-    private val firebaseAuth: FirebaseAuth
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(ArticleViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return ArticleViewModel(articleRepository, translationRepository, ttsService, firebaseAuth) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
+        Log.d("ArticleViewModel", "ViewModel cleared.")
     }
 }

@@ -16,7 +16,7 @@ data class Article(
     val createdAt: Date? = null,
     @ServerTimestamp
     val updatedAt: Date? = null,
-    val isPublished: Boolean = false
+    val published: Boolean = false
 ) {
     constructor() : this("", "", null, "", "", "en", null, null, false)
 }
