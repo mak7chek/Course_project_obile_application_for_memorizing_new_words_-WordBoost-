@@ -16,7 +16,7 @@ class PracticeUtilsTest {
         val oldRep = 0
         val oldEF = 2.5f
         val oldInt = 0L
-        val quality = 4 // Правильна відповідь
+        val quality = 4
 
         val (newRep, newEF, newInterval) = PracticeUtils.sm2(oldRep, oldEF, oldInt, quality)
 

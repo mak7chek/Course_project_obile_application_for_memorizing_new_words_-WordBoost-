@@ -12,8 +12,7 @@ fun MyBottomNavigationBar(navController: NavController) {
     val items = listOf(
         BottomNavItem.Home,
         BottomNavItem.Sets,
-//        BottomNavItem.Articles
-        // BottomNavItem.Profile // Якщо додаси
+        BottomNavItem.Articles
     )
 
     NavigationBar {

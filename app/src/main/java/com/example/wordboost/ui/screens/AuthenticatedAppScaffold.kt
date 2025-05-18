@@ -30,6 +30,8 @@ import com.example.wordboost.navigation.BottomNavItem
 import com.example.wordboost.ui.components.MyBottomNavigationBar
 import com.example.wordboost.viewmodel.SetsViewModel
 import com.example.wordboost.viewmodel.SetsViewModelFactory
+import com.example.wordboost.viewmodel.ArticleViewModel
+import com.example.wordboost.viewmodel.ArticleViewModelFactory
 import com.example.wordboost.viewmodel.WordListViewModelFactory
 import kotlinx.coroutines.launch
 
@@ -247,10 +249,6 @@ fun SetsScreen(
     }
 }
 
-@Composable
-fun ArticlesScreen() { Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){Text("Екран Статей",style=MaterialTheme.typography.headlineMedium);Text("Ця функція в розробці.")} }
-
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthenticatedAppScaffold(
@@ -287,6 +285,16 @@ fun AuthenticatedAppScaffold(
             composable(BottomNavItem.Sets.route) {
                 val viewModel: SetsViewModel = viewModel(factory = setsViewModelFactory)
                 SetsScreen(
+                    viewModel = viewModel,
+                    onNavigateToCreateSet = onNavigateToCreateSet,
+                    onNavigateToViewPublicSet = { setId -> onNavigateToBrowseSet(setId) },
+                    onNavigateToBrowseMySet = { setId -> onNavigateToBrowseSet(setId) },
+                    onNavigateToEditSet = { setId -> onNavigateToEditSet(setId) }
+                )
+            }
+            composable(BottomNavItem.Articles.route) {
+                val viewModel: ArticleViewModel = viewModel(factory = setsViewModelFactory)
+                ArticlesScreen(
                     viewModel = viewModel,
                     onNavigateToCreateSet = onNavigateToCreateSet,
                     onNavigateToViewPublicSet = { setId -> onNavigateToBrowseSet(setId) },

@@ -31,9 +31,9 @@ sealed class BottomNavItem(
         icon = { Icon(painter = painterResource(id = R.drawable.archive_svgrepo_com), contentDescription = "Набори", modifier = defaultIconSizeModifier) }
     )
 
-//    object Articles : BottomNavItem(
-//        route = "articles",
-//        label = "Статті",
-//        icon = { Icon(painter = painterResource(id = R.drawable.open_book_svgrepo_com), contentDescription = "Статті", modifier = defaultIconSizeModifier) }
-//    )
+    object Articles : BottomNavItem(
+        route = "articles",
+        label = "Статті",
+        icon = { Icon(painter = painterResource(id = R.drawable.open_book_svgrepo_com), contentDescription = "Статті", modifier = defaultIconSizeModifier) }
+    )
 }
