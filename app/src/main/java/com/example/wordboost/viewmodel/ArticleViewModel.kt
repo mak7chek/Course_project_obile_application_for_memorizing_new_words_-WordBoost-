@@ -10,6 +10,8 @@ import com.example.wordboost.data.model.UserArticleInteraction // Додай, я
 import com.example.wordboost.data.repository.TranslationRepository
 import com.example.wordboost.data.tts.TextToSpeechService
 import com.google.firebase.firestore.FieldValue // Важливий імпорт
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -36,6 +38,13 @@ class ArticleViewModel(
     private val currentUserIdInternal: String?
         get() = authRepository.getCurrentUser()?.uid
 
+    private val _autoTranslatedText = MutableStateFlow<String?>(null)
+    val autoTranslatedText: StateFlow<String?> = _autoTranslatedText.asStateFlow()
+
+    private val _isLoadingAutomaticTranslation = MutableStateFlow(false)
+    val isLoadingAutomaticTranslation: StateFlow<Boolean> = _isLoadingAutomaticTranslation.asStateFlow()
+
+    private var autoTranslationJob: Job? = null
     // --- StateFlows для UI ---
     private val _userArticles = MutableStateFlow<List<ArticleUiModel>>(emptyList())
     val userArticles: StateFlow<List<ArticleUiModel>> = _userArticles.asStateFlow()
@@ -74,7 +83,8 @@ class ArticleViewModel(
 
     private var articleIdToDelete: String? = null
     private var articleTitleToDelete: String? = null
-
+    private val _isLoadingCurrentArticle = MutableStateFlow(false)
+    val isLoadingCurrentArticle: StateFlow<Boolean> = _isLoadingCurrentArticle.asStateFlow()
     // --- Для статусу збереження статті ---
     private val _saveArticleStatus = MutableStateFlow<SaveArticleStatus>(SaveArticleStatus.Idle)
     val saveArticleStatus: StateFlow<SaveArticleStatus> = _saveArticleStatus.asStateFlow()
@@ -93,7 +103,49 @@ class ArticleViewModel(
             _publishedArticles.value = emptyList()
         }
     }
+    fun requestAutomaticTranslation(text: String, articleLanguageCode: String) {
+        autoTranslationJob?.cancel() // Скасовуємо попередній запит, якщо він ще виконується
 
+        if (text.isBlank()) {
+            _autoTranslatedText.value = null
+            _isLoadingAutomaticTranslation.value = false
+            return
+        }
+
+        val MAX_CHARS_FOR_AUTO_TRANSLATE = 300
+        if (text.length > MAX_CHARS_FOR_AUTO_TRANSLATE) {
+            Log.w("ArticleVM", "Текст '$text' занадто довгий для автоматичного перекладу (${text.length} символів).")
+            _autoTranslatedText.value = "[Виділений текст занадто довгий для авто-перекладу]" // Або null і показати Snackbar
+            _isLoadingAutomaticTranslation.value = false
+            return
+        }
+
+        val targetLanguage = if (articleLanguageCode.startsWith("en", ignoreCase = true)) "uk" else "en"
+
+        autoTranslationJob = viewModelScope.launch { // Або інший scope, якщо потрібно
+            delay(750L)
+            _isLoadingAutomaticTranslation.value = true
+            _autoTranslatedText.value = null // Скидаємо попередній результат на час завантаження
+            Log.d("ArticleVM", "Автоматичний переклад для: '$text' -> $targetLanguage")
+            try {
+                val translation = translationRepository.translateForSetCreationSuspend(text, targetLanguage)
+                _autoTranslatedText.value = translation
+                Log.d("ArticleVM", "Результат авто-перекладу: '$translation'")
+            } catch (e: Exception) {
+                Log.e("ArticleVM", "Помилка автоматичного перекладу", e)
+                _autoTranslatedText.value = null // Або спеціальне значення для помилки
+                // _errorMessage.value = "Помилка автоматичного перекладу." // Може бути занадто нав'язливо
+            } finally {
+                _isLoadingAutomaticTranslation.value = false
+            }
+        }
+    }
+
+    fun clearAutomaticTranslation() {
+        autoTranslationJob?.cancel()
+        _autoTranslatedText.value = null
+        _isLoadingAutomaticTranslation.value = false
+    }
     fun loadUserArticles() {
         currentUserIdInternal?.let { userId ->
             viewModelScope.launch {
@@ -225,69 +277,23 @@ class ArticleViewModel(
 
     fun loadArticleContent(articleId: String) {
         viewModelScope.launch {
+            _isLoadingCurrentArticle.value = true // Починаємо завантаження
             Log.d("ArticleViewModel", "Loading content for articleId: $articleId")
             firebaseRepository.getArticleByIdFlow(articleId)
                 .catch { e ->
                     _errorMessage.value = "Помилка завантаження статті: ${e.message}"
                     Log.e("ArticleViewModel", "Error loading article $articleId content", e)
-                    // _isLoadingCurrentArticle.value = false
+                    _isLoadingCurrentArticle.value = false
                 }
                 .collect { article ->
                     _currentViewingArticle.value = article
-                    // _isLoadingCurrentArticle.value = false
+                    _isLoadingCurrentArticle.value = false // Завершуємо завантаження
                     if (article != null) {
-                        Log.d(
-                            "ArticleViewModel",
-                            "Article $articleId content loaded: ${article.title}"
-                        )
-                        currentUserIdInternal?.let { userId ->
-                            launch {
-                                Log.d(
-                                    "ArticleViewModel",
-                                    "Marking article $articleId as read for userId: $userId"
-                                )
-                                firebaseRepository.markArticleInteraction(
-                                    userId,
-                                    articleId,
-                                    isRead = true
-                                )
-                                    .onFailure { e ->
-                                        _errorMessage.value =
-                                            "Не вдалося позначити статтю як прочитану: ${e.message}"
-                                        Log.e(
-                                            "ArticleViewModel",
-                                            "Error marking article $articleId as read",
-                                            e
-                                        )
-                                    }
-                                    .onSuccess {
-                                        Log.d(
-                                            "ArticleViewModel",
-                                            "Article $articleId marked as read successfully for userId: $userId"
-                                        )
-                                        _userArticles.update { list ->
-                                            list.map {
-                                                if (it.article.id == articleId) it.copy(
-                                                    isRead = true
-                                                ) else it
-                                            }
-                                        }
-                                        _publishedArticles.update { list ->
-                                            list.map {
-                                                if (it.article.id == articleId) it.copy(
-                                                    isRead = true
-                                                ) else it
-                                            }
-                                        }
-                                    }
-                            }
-                        }
+                        Log.d("ArticleViewModel", "Article $articleId content loaded: ${article.title}")
+
                     } else {
                         _errorMessage.value = "Не вдалося завантажити статтю."
-                        Log.w(
-                            "ArticleViewModel",
-                            "Article $articleId content is null after loading."
-                        )
+                        Log.w("ArticleViewModel", "Article $articleId content is null after loading.")
                     }
                 }
         }
@@ -427,18 +433,17 @@ class ArticleViewModel(
             return
         }
         viewModelScope.launch {
-            Log.d("ArticleViewModel", "Translating text: \"$text\" to $targetLanguage")
+            Log.d("ArticleViewModel", "Translating text (using forSetCreation): \"$text\" to $targetLanguage")
             val translation =
-                translationRepository.translateForUserVocabularySuspend(text, targetLanguage)
+                translationRepository.translateForSetCreationSuspend(text, targetLanguage)
             _translatedText.value = translation
-            _isTranslationDialogVisible.value = translation != null
+            _isTranslationDialogVisible.value = !translation.isNullOrBlank()
             Log.d("ArticleViewModel", "Translation result: \"$translation\"")
         }
     }
 
     fun dismissTranslationDialog() {
         _isTranslationDialogVisible.value = false
-        // _translatedText.value = null // Можна не скидати, якщо потрібно кешувати
     }
 
     fun speakText(text: String, languageCode: String = "en") {
@@ -448,6 +453,46 @@ class ArticleViewModel(
         } else {
             _errorMessage.value = "Озвучування для мови '$languageCode' поки не підтримується."
             Log.w("ArticleViewModel", "TTS for language '$languageCode' not supported yet.")
+        }
+    }
+    suspend fun getTranslationForSelectedText(text: String, targetLanguage: String): String? {
+        if (text.isBlank()) return null
+        return translationRepository.translateForSetCreationSuspend(text, targetLanguage)
+    }
+    fun markArticleAsReadExplicitly(articleId: String?) {
+        if (articleId == null) return
+        currentUserIdInternal?.let { userId ->
+            viewModelScope.launch {
+                // Перевіримо, чи стаття вже не позначена як прочитана, щоб уникнути зайвих записів
+                // і повторного оновлення UI, якщо статус не змінився.
+                val isAlreadyRead = _userArticles.value.find { it.article.id == articleId }?.isRead == true ||
+                        _publishedArticles.value.find { it.article.id == articleId }?.isRead == true ||
+                        // Якщо стаття відкрита вперше і ще немає в списках, вона точно не прочитана
+                        (_currentViewingArticle.value?.id == articleId &&
+                                !(_userArticles.value.any{it.article.id == articleId} || _publishedArticles.value.any{it.article.id == articleId}))
+
+
+                // Якщо стаття не була позначена як прочитана або це перше відкриття
+                // (в цьому випадку isAlreadyRead може бути неточним до першого завантаження списків,
+                // тому краще покладатися на те, що markArticleInteraction сама впорається з merge)
+                Log.d("ArticleViewModel", "Explicitly marking article $articleId as read for userId: $userId. Was already read: $isAlreadyRead")
+
+                firebaseRepository.markArticleInteraction(userId, articleId, isRead = true)
+                    .onSuccess {
+                        Log.i("ArticleViewModel", "Article $articleId EXPLICITLY marked as read successfully for user $userId.")
+                        // Оновлюємо локальні списки для негайного відображення зміни статусу
+                        _userArticles.update { list ->
+                            list.map { if (it.article.id == articleId) it.copy(isRead = true) else it }
+                        }
+                        _publishedArticles.update { list ->
+                            list.map { if (it.article.id == articleId) it.copy(isRead = true) else it }
+                        }
+                    }
+                    .onFailure { e ->
+                        _errorMessage.value = "Не вдалося оновити статус прочитання: ${e.message}"
+                        Log.e("ArticleViewModel", "Error explicitly marking article $articleId as read for user $userId", e)
+                    }
+            }
         }
     }
 

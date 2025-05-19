@@ -20,8 +20,6 @@ import com.example.wordboost.viewmodel.CreateSetViewModel
 import com.example.wordboost.viewmodel.CreateSetViewModelFactory
 import com.example.wordboost.viewmodel.EditWordViewModelFactory
 import com.example.wordboost.viewmodel.PracticeViewModelFactory
-import com.example.wordboost.ui.screens.BrowseSharedSetScreen
-import com.example.wordboost.viewmodel.TranslateViewModelFactory
 import com.example.wordboost.viewmodel.WordListViewModelFactory
 import com.example.wordboost.viewmodel.SetsViewModelFactory
 import com.example.wordboost.ui.screens.createset.CreateSetScreen
@@ -29,7 +27,7 @@ import com.example.wordboost.viewmodel.BrowseSharedSetViewModel
 import com.example.wordboost.viewmodel.BrowseSetViewModelFactory
 import com.example.wordboost.viewmodel.ArticleViewModel
 import com.example.wordboost.viewmodel.ArticleViewModelFactory
-import com.example.wordboost.ui.screens.articles.CreateEditArticleScreen
+import com.example.wordboost.ui.screens.articles.*
 
 enum class TopLevelScreenState {
     Loading,
@@ -41,7 +39,6 @@ enum class TopLevelScreenState {
     EditWordFullScreen,
     CreateSetWizardFullScreen,
     BrowseSharedSetFullScreen,
-    ArticlesListFullScreen,
     ViewArticleFullScreen,
     CreateEditArticleFullScreen
 }
@@ -66,6 +63,8 @@ fun MainScreen(
 
     var viewingArticleId by remember { mutableStateOf<String?>(null) }
     var editingArticleId by remember { mutableStateOf<String?>(null) }
+    var enTextForTranslateScreen by remember { mutableStateOf<String?>(null) }
+    var ukTextForTranslateScreen by remember { mutableStateOf<String?>(null) }
 
     val practiceViewModelFactory = remember(practiceRepo, ttsService, authRepo) { PracticeViewModelFactory(repository = practiceRepo, ttsService = ttsService, authRepository = authRepo) }
     val wordListViewModelFactory = remember(firebaseRepo, authRepo, ttsService) { WordListViewModelFactory(repository = firebaseRepo, authRepository = authRepo, ttsService = ttsService) }
@@ -80,6 +79,17 @@ fun MainScreen(
             authRepository = authRepo
         )
     }
+    val navigateToTranslateScreenWithData: (originalText: String, translatedText: String, articleLanguageCode: String) -> Unit =
+        { original, translated, langCode ->
+            if (langCode.startsWith("en", ignoreCase = true)) {
+                enTextForTranslateScreen = original
+                ukTextForTranslateScreen = translated
+            } else {
+                ukTextForTranslateScreen = original
+                enTextForTranslateScreen = translated
+            }
+            currentTopLevelScreenState = TopLevelScreenState.TranslateWordFullScreen
+        }
     LaunchedEffect(key1 = authRepo) {
         Log.d("MainScreen", "Auth state listener collection started.")
         authRepo.getAuthState().collect { user ->
@@ -139,6 +149,7 @@ fun MainScreen(
                     onNavigateToTranslate = { currentTopLevelScreenState = TopLevelScreenState.TranslateWordFullScreen },
                     onNavigateToPractice = { currentTopLevelScreenState = TopLevelScreenState.PracticeSessionFullScreen },
                     onNavigateToWordList = { currentTopLevelScreenState = TopLevelScreenState.WordListFullScreen },
+
                     onNavigateToCreateSet = {
                         editingSetId = null
                         currentTopLevelScreenState = TopLevelScreenState.CreateSetWizardFullScreen
@@ -157,66 +168,40 @@ fun MainScreen(
                     wordListViewModelFactory = wordListViewModelFactory,
                     setsViewModelFactory = setsViewModelFactory,
                     articleViewModelFactory = articleViewModelFactory,
-                    // onNavigateToArticlesList ПРИБРАНО ЗВІДСИ
                     onNavigateToViewArticle = { articleId ->
                         viewingArticleId = articleId
                         currentTopLevelScreenState = TopLevelScreenState.ViewArticleFullScreen
                     },
                     onNavigateToCreateArticle = {
-                        editingArticleId = null // Створення нової статті
+                        editingArticleId = null
                         currentTopLevelScreenState = TopLevelScreenState.CreateEditArticleFullScreen
                     },
                     onNavigateToEditArticle = { articleId ->
-                        editingArticleId = articleId // Редагування існуючої
+                        editingArticleId = articleId
                         currentTopLevelScreenState = TopLevelScreenState.CreateEditArticleFullScreen
                     }
                 )
             }
-            TopLevelScreenState.ArticlesListFullScreen -> {
-                val articleViewModel: ArticleViewModel = viewModel(factory = articleViewModelFactory)
-                // Заміни Text на твій ArticlesListScreen
-                /*
-                ArticlesListScreen(
-                    viewModel = articleViewModel,
-                    onViewArticle = { articleId ->
-                        viewingArticleId = articleId
-                        currentTopLevelScreenState = TopLevelScreenState.ViewArticleFullScreen
-                    },
-                    onCreateArticle = {
-                        editingArticleId = null
-                        currentTopLevelScreenState = TopLevelScreenState.CreateEditArticleFullScreen
-                    },
-                    onEditArticle = { articleId ->
-                        editingArticleId = articleId
-                        currentTopLevelScreenState = TopLevelScreenState.CreateEditArticleFullScreen
-                    },
-                    onBack = { currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp }
-                )
-                */
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("ArticlesListScreen Placeholder (Повернення на Головний екран через 5с)")
-                }
-                LaunchedEffect(Unit){ kotlinx.coroutines.delay(5000); if(currentTopLevelScreenState == TopLevelScreenState.ArticlesListFullScreen) currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp }
-            }
+
             TopLevelScreenState.ViewArticleFullScreen -> {
                 viewingArticleId?.let { articleId ->
                     val articleViewModel: ArticleViewModel = viewModel(key = "ViewArticle_$articleId", factory = articleViewModelFactory)
-                    // Заміни Text на твій ViewArticleScreen
-                    /*
                     ViewArticleScreen(
                         articleId = articleId,
                         viewModel = articleViewModel,
                         onBack = {
                             viewingArticleId = null
-                            currentTopLevelScreenState = TopLevelScreenState.ArticlesListFullScreen
-                        }
+                            currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp
+                        },
+                        onNavigateToTranslateScreenWithData = navigateToTranslateScreenWithData
                     )
-                    */
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("ViewArticleScreen Placeholder for $articleId (Повернення до списку через 5с)")
+
+
+                } ?: LaunchedEffect(Unit) {
+                    if (currentTopLevelScreenState == TopLevelScreenState.ViewArticleFullScreen) {
+                        currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp
                     }
-                    LaunchedEffect(Unit){ kotlinx.coroutines.delay(5000); if(currentTopLevelScreenState == TopLevelScreenState.ViewArticleFullScreen) currentTopLevelScreenState = TopLevelScreenState.ArticlesListFullScreen }
-                } ?: LaunchedEffect(Unit) { currentTopLevelScreenState = TopLevelScreenState.ArticlesListFullScreen }
+                }
             }
             TopLevelScreenState.CreateEditArticleFullScreen -> {
                 Log.d("MainScreen", "Showing CreateEditArticleFullScreen for articleId: $editingArticleId")
@@ -224,27 +209,33 @@ fun MainScreen(
                     key = editingArticleId ?: "CreateArticle", // Унікальний ключ
                     factory = articleViewModelFactory
                 )
-                CreateEditArticleScreen( // Виклик твого нового екрану
+                CreateEditArticleScreen(
                     editingArticleId = editingArticleId,
                     viewModel = articleViewModel,
                     onSaveSuccess = {
-                        Log.d("MainScreen", "Save success for article, navigating back to ArticlesList.")
+                        Log.d("MainScreen", "Save success for article, navigating back to AuthenticatedApp.")
                         editingArticleId = null // Скидаємо ID після збереження
-                        currentTopLevelScreenState = TopLevelScreenState.ArticlesListFullScreen // Або AuthenticatedApp, залежно від логіки
+                        currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp // <--- ЗМІНА ТУТ
                     },
                     onBack = {
-                        Log.d("MainScreen", "Back from CreateEditArticle, navigating back to ArticlesList.")
+                        Log.d("MainScreen", "Back from CreateEditArticle, navigating back to AuthenticatedApp.")
                         editingArticleId = null
-                        currentTopLevelScreenState = TopLevelScreenState.ArticlesListFullScreen // Або AuthenticatedApp
+                        currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp // <--- ЗМІНА ТУТ
                     }
                 )
             }
             TopLevelScreenState.TranslateWordFullScreen -> {
-                Log.d("MainScreen", "Showing TranslateWordFullScreen")
+                Log.d("MainScreen", "Showing TranslateWordFullScreen with EN: '$enTextForTranslateScreen', UK: '$ukTextForTranslateScreen'")
                 TranslateScreen(
                     firebaseRepo = firebaseRepo,
                     translationRepo = translationRepo,
-                    onBack = { currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp }
+                    initialEn = enTextForTranslateScreen,
+                    initialUk = ukTextForTranslateScreen,
+                    onBack = {
+                        currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp
+                        enTextForTranslateScreen = null
+                        ukTextForTranslateScreen = null
+                    }
                 )
             }
             TopLevelScreenState.PracticeSessionFullScreen -> {

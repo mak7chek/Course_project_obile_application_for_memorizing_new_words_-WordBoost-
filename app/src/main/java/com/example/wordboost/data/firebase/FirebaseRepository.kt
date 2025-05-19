@@ -18,8 +18,7 @@ import kotlin.coroutines.resume
 import com.example.wordboost.viewmodel.SharedSetDetailsWithWords
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.QuerySnapshot
-import com.google.firebase.firestore.ktx.toObject
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOf
 
 class FirebaseRepository(private val authRepository: AuthRepository) {
     private val db = Firebase.firestore
@@ -41,9 +40,9 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
 
     private fun getSharedSetsCollection() = db.collection("sharedCardSets")
     private fun getArticlesCollection() = db.collection("articles")
-    private fun getUserArticleInteractionsCollection() = db.collection("userArticleInteractions")
+    private fun getUserArticleInteractionsCollection(userId: String) =
+        db.collection("users").document(userId).collection("articleInteractions")
 
-    // --- Методи для Статей (Article) ---
 
     suspend fun addArticle(article: Article): Result<String> {
         val currentUser = authRepository.getCurrentUser()
@@ -51,12 +50,10 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
             Log.e(TAG, "addArticle: User not authenticated.")
             return Result.failure(IllegalStateException("User not authenticated."))
         }
-        // Переконуємося, що автор статті - поточний користувач
-        // ID буде згенеровано Firebase, тому передаємо article.copy(id = "")
         val articleData = article.copy(
-            id = "", // ID буде встановлено Firestore
+            id = "",
             userId = currentUser.uid,
-            authorName = currentUser.displayName ?: article.authorName // Використовуємо displayName якщо є
+            authorName = currentUser.displayName ?: article.authorName
         )
 
         return try {
@@ -78,15 +75,9 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
             Log.e(TAG, "updateArticle: Article ID is blank.")
             return Result.failure(IllegalArgumentException("Article ID cannot be blank."))
         }
-        // Можна додати перевірку авторства тут, якщо потрібно
-        // val doc = getArticlesCollection().document(articleId).get().await()
-        // if (doc.exists() && doc.getString("userId") != currentUserUid) {
-        //    return Result.failure(SecurityException("User is not the author."))
-        // }
 
         return try {
             val finalUpdates = updates.toMutableMap()
-            // Переконуємося, що `updatedAt` буде оновлено, якщо воно є в мапі або встановлено як FieldValue
             if (!finalUpdates.containsKey("updatedAt")) {
                 finalUpdates["updatedAt"] = FieldValue.serverTimestamp()
             }
@@ -102,30 +93,40 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
         val currentUserUid = authRepository.getCurrentUser()?.uid
         if (currentUserUid == null) {
             Log.e(TAG, "deleteArticle: User not authenticated.")
-            return Result.failure(IllegalStateException("User not authenticated."))
+            return Result.failure(IllegalStateException("User not authenticated for delete operation"))
         }
         if (articleId.isBlank()) {
             Log.e(TAG, "deleteArticle: Article ID is blank.")
-            return Result.failure(IllegalArgumentException("Article ID cannot be blank."))
+            return Result.failure(IllegalArgumentException("Article ID cannot be blank for delete operation"))
         }
-        // Можна додати перевірку авторства тут
+
+        try {
+            val articleDoc = getArticlesCollection().document(articleId).get().await()
+            if (!articleDoc.exists()) {
+                Log.w(TAG, "deleteArticle: Article $articleId not found.")
+                return Result.failure(NoSuchElementException("Article not found."))
+            }
+            if (articleDoc.getString("userId") != currentUserUid) {
+                Log.w(TAG, "deleteArticle: User $currentUserUid is not the author of article $articleId.")
+                return Result.failure(SecurityException("User is not the author of the article and cannot delete it."))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking article $articleId authorship before delete", e)
+            return Result.failure(e)
+        }
 
         return try {
             val batch = db.batch()
-            // Видалення самої статті
             batch.delete(getArticlesCollection().document(articleId))
 
-            // Видалення пов'язаних UserArticleInteraction записів
-            val interactionsQuery = getUserArticleInteractionsCollection()
-                .whereEqualTo("articleId", articleId)
-                .get().await()
-            if (!interactionsQuery.isEmpty) {
-                interactionsQuery.documents.forEach { batch.delete(it.reference) }
-            }
+            Log.d(TAG, "Preparing to delete interaction for user $currentUserUid, article $articleId")
+            batch.delete(getUserArticleInteractionsCollection(currentUserUid).document(articleId))
+
             batch.commit().await()
+            Log.i(TAG, "Article $articleId and its interaction for user $currentUserUid deleted successfully.")
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e(TAG, "Error deleting article with ID: $articleId", e)
+            Log.e(TAG, "Error during batch delete for article $articleId", e)
             Result.failure(e)
         }
     }
@@ -137,8 +138,7 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
                         Log.w(TAG, "Listen failed for article $articleId.", error)
-                        trySend(null).isSuccess // Надсилаємо null у випадку помилки, щоб Flow не закривався
-                        // close(error) // Або закриваємо Flow з помилкою
+                        trySend(null).isSuccess
                         return@addSnapshotListener
                     }
                     val article = snapshot?.toObject(Article::class.java)
@@ -154,11 +154,11 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
             val listenerRegistration = getArticlesCollection()
                 .whereEqualTo("userId", userId)
                 .orderBy("updatedAt", Query.Direction.DESCENDING)
+                .limit(50)
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
                         Log.w(TAG, "Listen failed for user articles, userId: $userId.", error)
-                        trySend(emptyList()).isSuccess // Надсилаємо порожній список
-                        // close(error)
+                        trySend(emptyList()).isSuccess
                         return@addSnapshotListener
                     }
                     val articles = snapshot?.toObjects(Article::class.java) ?: emptyList()
@@ -167,22 +167,20 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
             awaitClose { listenerRegistration.remove() }
         }
     }
-
     fun getPublishedArticlesFlow(currentUserIdToExcludeFilterClientSide: String? = null): Flow<List<Article>> {
         val query = getArticlesCollection()
-            .whereEqualTo("isPublished", true)
+            .whereEqualTo("published", true)
             .orderBy("updatedAt", Query.Direction.DESCENDING)
+            .limit(50) // Додав ліміт для безпеки та продуктивності
 
         return callbackFlow {
             val listenerRegistration = query.addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.w(TAG, "Listen failed for published articles.", error)
                     trySend(emptyList()).isSuccess
-                    // close(error)
                     return@addSnapshotListener
                 }
                 var articles = snapshot?.toObjects(Article::class.java) ?: emptyList()
-                // Фільтрація на клієнті, якщо потрібно виключити статті поточного користувача
                 if (currentUserIdToExcludeFilterClientSide != null) {
                     articles = articles.filter { it.userId != currentUserIdToExcludeFilterClientSide }
                 }
@@ -193,16 +191,13 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
     }
 
     fun getUserArticleInteractionFlow(userId: String, articleId: String): Flow<UserArticleInteraction?> {
-        if (userId.isBlank() || articleId.isBlank()) return callbackFlow { trySend(null).isSuccess; awaitClose {}}
-
-        val interactionDocId = "${userId}_${articleId}" // Формуємо ID документа
-
+        if (userId.isBlank() || articleId.isBlank()) return flowOf(null)
         return callbackFlow {
-            val listenerRegistration = getUserArticleInteractionsCollection().document(interactionDocId)
+            val listenerRegistration = getUserArticleInteractionsCollection(userId).document(articleId)
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
-                        Log.w(TAG, "Listen failed for interaction $interactionDocId.", error)
-                        trySend(null).isSuccess
+                        Log.w(TAG, "Listen failed for user article interaction, userId: $userId, articleId: $articleId.", error)
+                        trySend(null).isSuccess // Або close(error) якщо хочете перервати Flow помилкою
                         return@addSnapshotListener
                     }
                     val interaction = snapshot?.toObject(UserArticleInteraction::class.java)
@@ -216,24 +211,21 @@ class FirebaseRepository(private val authRepository: AuthRepository) {
         if (userId.isBlank() || articleId.isBlank()) {
             return Result.failure(IllegalArgumentException("User ID or Article ID cannot be blank."))
         }
-        val interactionDocId = "${userId}_${articleId}" // ID документа для взаємодії
 
-        // Створюємо або оновлюємо дані
-        // id в UserArticleInteraction буде interactionDocId
+
         val interactionObject = UserArticleInteraction(
-            id = interactionDocId,
+            id = articleId, // ID документа = ID статті
             userId = userId,
             articleId = articleId,
             isRead = isRead
-            // lastReadTimestamp буде встановлено Firestore через @ServerTimestamp, якщо в моделі воно Date? = null
         )
 
         return try {
-            getUserArticleInteractionsCollection().document(interactionDocId)
+            getUserArticleInteractionsCollection(userId).document(articleId)
                 .set(interactionObject, SetOptions.merge()).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e(TAG, "Error marking article interaction for $interactionDocId, isRead: $isRead", e)
+            Log.e(TAG, "Error marking article interaction for user $userId, article $articleId", e)
             Result.failure(e)
         }
     }

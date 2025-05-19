@@ -280,9 +280,8 @@ fun AuthenticatedAppScaffold(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Home.route) {
-                // Твій AuthenticatedMainScreen, який ти надав
                 AuthenticatedMainScreen(
-                    navController = navController, // Передаємо, якщо AuthenticatedMainScreen має власну логіку навігації
+                    navController = navController,
                     onNavigateToTranslate = onNavigateToTranslate,
                     onNavigateToPractice = onNavigateToPractice,
                     onNavigateToWordList = onNavigateToWordList,
@@ -292,7 +291,7 @@ fun AuthenticatedAppScaffold(
             }
             composable(BottomNavItem.Sets.route) {
                 val viewModel: SetsViewModel = viewModel(factory = setsViewModelFactory)
-                SetsScreen( // Ти вже надав цей код
+                SetsScreen(
                     viewModel = viewModel,
                     onNavigateToCreateSet = onNavigateToCreateSet,
                     onNavigateToViewPublicSet = { setId -> onNavigateToBrowseSet(setId) },
@@ -302,15 +301,12 @@ fun AuthenticatedAppScaffold(
             }
             composable(BottomNavItem.Articles.route) {
                     val articleViewModel: ArticleViewModel = viewModel(factory = articleViewModelFactory)
-                    ArticlesListScreen( // Розкоментуй та підключи
+                    ArticlesListScreen(
                         viewModel = articleViewModel,
                         onViewArticle = onNavigateToViewArticle,
                         onCreateArticle = onNavigateToCreateArticle,
                         onEditArticle = onNavigateToEditArticle
                     )
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("ArticlesListScreen (Section) Placeholder") // Тимчасова заглушка
-                }
             }
         }
     }

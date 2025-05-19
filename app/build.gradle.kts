@@ -63,9 +63,14 @@ android {
             isReturnDefaultValues = true // ось так
         }
     }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.14" // Або інша сумісна версія
+    }
 }
 
-dependencies {
+dependencies { 
+    implementation("androidx.compose.foundation:foundation") // Ця бібліотека містить SelectionContainer
+
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     testImplementation("org.mockito:mockito-core:5.11.0")

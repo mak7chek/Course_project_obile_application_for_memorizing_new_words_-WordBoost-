@@ -34,6 +34,8 @@ import kotlinx.coroutines.launch
 fun TranslateScreen(
     firebaseRepo: FirebaseRepository,
     translationRepo: TranslationRepository,
+    initialEn: String? = null,
+    initialUk: String? = null,
     onBack: () -> Unit
 ) {
     val viewModel: TranslateViewModel = viewModel(
@@ -64,7 +66,18 @@ fun TranslateScreen(
         }
     }
 
-
+    LaunchedEffect(initialEn, initialUk) {
+        initialEn?.let {
+            if (viewModel.enText.value != it) {
+                viewModel.setEnText(it)
+            }
+        }
+        initialUk?.let {
+            if (viewModel.ukText.value != it) {
+                viewModel.setUkText(it)
+            }
+        }
+    }
     Scaffold(
         topBar = {
             TopAppBar(

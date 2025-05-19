@@ -27,7 +27,6 @@ fun ArticlesListScreen(
     onCreateArticle: () -> Unit,
     onEditArticle: (articleId: String) -> Unit
 ) {
-    // Використовуємо явне вказання типу для collectAsState, щоб допомогти компілятору
     val userArticles: List<ArticleUiModel> by viewModel.userArticles.collectAsState()
     val publishedArticles: List<ArticleUiModel> by viewModel.publishedArticles.collectAsState()
     val isLoadingUserArticles: Boolean by viewModel.isLoadingUserArticles.collectAsState()
@@ -109,7 +108,7 @@ fun ArticlesListScreen(
                             userArticles.forEach { articleUiModel ->
                                 ArticleListItem(
                                     articleUiModel = articleUiModel,
-                                    isMyArticle = true, // У цій секції завжди мої статті
+                                    isMyArticle = true,
                                     onViewClick = { onViewArticle(articleUiModel.article.id) },
                                     onEditClick = { onEditArticle(articleUiModel.article.id) },
                                     onDeleteClick = { viewModel.requestDeleteArticle(articleUiModel.article.id, articleUiModel.article.title) }
@@ -127,9 +126,8 @@ fun ArticlesListScreen(
                 }
             }
 
-            item { Spacer(Modifier.height(8.dp)) } // Зменшив розділювач
+            item { Spacer(Modifier.height(8.dp)) }
 
-            // Секція "Публічні статті"
             item {
                 SectionHeader(
                     title = "Публічні статті",
