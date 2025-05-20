@@ -61,7 +61,7 @@ class PracticeRepository(private val firebase: FirebaseRepository) {
 
 
 
-    fun resetWordProgress(word: Word, callback: (Boolean) -> Unit) { // <--- ПЕРЕКОНАЙСЯ, ЩО ТУТ (Boolean) -> Unit
+    fun resetWordProgress(word: Word, callback: (Boolean) -> Unit) {
         val reset = word.copy(
             repetition = 0,
             easiness = 2.5f,

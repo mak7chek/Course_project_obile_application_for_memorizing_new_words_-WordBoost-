@@ -7,13 +7,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
-import androidx.compose.runtime.* // Потрібен для getValue, remember, etc.
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.wordboost.viewmodel.ArticleUiModel // Імпорт твоєї моделі
+import com.example.wordboost.viewmodel.ArticleUiModel
 import com.example.wordboost.ui.components.ArticleListItem
 import com.example.wordboost.ui.screens.SectionHeader
 import com.example.wordboost.viewmodel.ArticleViewModel
@@ -39,17 +39,15 @@ fun ArticlesListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) { // Завантажуємо дані при першому вході на екран, якщо потрібно
+    LaunchedEffect(Unit) {
         Log.d("ArticlesListScreen", "LaunchedEffect: Initial data load if needed.")
-        // viewModel.loadUserArticles() // ViewModel вже робить це в init, якщо користувач залогінений
-        // viewModel.loadPublishedArticles()
     }
 
     LaunchedEffect(errorMessage) {
         errorMessage?.let {
             Log.d("ArticlesListScreen", "Showing error snackbar: $it")
             coroutineScope.launch {
-                snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Long) // Long для кращої видимості
+                snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Long)
                 viewModel.clearErrorMessage()
             }
         }
@@ -85,10 +83,9 @@ fun ArticlesListScreen(
             modifier = Modifier
                 .padding(paddingValues)
                 .fillMaxSize(),
-            contentPadding = PaddingValues(all = 16.dp), // Змінив на all для симетрії
-            verticalArrangement = Arrangement.spacedBy(12.dp) // Збільшив трохи простір
+            contentPadding = PaddingValues(all = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Секція "Мої статті"
             item {
                 SectionHeader(
                     title = "Мої статті",
@@ -147,7 +144,7 @@ fun ArticlesListScreen(
                             publishedArticles.forEach { articleUiModel ->
                                 ArticleListItem(
                                     articleUiModel = articleUiModel,
-                                    isMyArticle = articleUiModel.isCurrentUserOwner, // Використовуємо поле з UiModel
+                                    isMyArticle = articleUiModel.isCurrentUserOwner,
                                     onViewClick = { onViewArticle(articleUiModel.article.id) },
                                     onEditClick = if (articleUiModel.isCurrentUserOwner) {
                                         { onEditArticle(articleUiModel.article.id) }

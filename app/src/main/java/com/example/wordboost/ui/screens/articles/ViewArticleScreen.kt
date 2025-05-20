@@ -9,9 +9,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.FormatAlignLeft // Або інша іконка для речення
+import androidx.compose.material.icons.filled.FormatAlignLeft
 import androidx.compose.material.icons.filled.LibraryAdd
-// import androidx.compose.material.icons.filled.Translate // Більше не потрібна для FloatingAppBar, якщо переклад автоматичний
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,12 +23,11 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.wordboost.data.model.Article
-import com.example.wordboost.data.util.findSentenceBoundaries // Переконайся, що цей імпорт правильний і функція існує
+import com.example.wordboost.data.util.findSentenceBoundaries
 import com.example.wordboost.viewmodel.ArticleViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.util.Locale
-// import java.text.BreakIterator // Якщо findSentenceBoundaries всередині цього файлу, інакше не потрібен тут
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,25 +37,15 @@ fun ViewArticleScreen(
     onBack: () -> Unit,
     onNavigateToTranslateScreenWithData: (originalText: String, translatedText: String, articleLanguageCode: String) -> Unit
 ) {
-    val articleState: Article? by viewModel.currentViewingArticle.collectAsState() // Використовується для контенту
-    val currentArticle = articleState // Для зручності, якщо articleState не null
+    val articleState: Article? by viewModel.currentViewingArticle.collectAsState()
+    val currentArticle = articleState
 
-    val isLoadingInitialLoad = articleState == null && articleId.isNotBlank() // Перейменував для ясності
+    val isLoadingInitialLoad = articleState == null && articleId.isNotBlank()
 
     val errorMessage: String? by viewModel.errorMessage.collectAsState()
 
-    // Цей блок для старого діалогу перекладу. Якщо він більше не потрібен, можна видалити.
-    // val explicitTranslatedTextState: String? by viewModel.translatedText.collectAsState()
-    // var showExplicitTranslationDialog by remember { mutableStateOf(false) }
-    // LaunchedEffect(explicitTranslatedTextState) {
-    //     showExplicitTranslationDialog = !explicitTranslatedTextState.isNullOrBlank()
-    // }
-    // if (showExplicitTranslationDialog && !explicitTranslatedTextState.isNullOrBlank()) {
-    //     AlertDialog(...)
-    // }
-
     val snackbarHostState = remember { SnackbarHostState() }
-    val localCoroutineScope = rememberCoroutineScope() // Для Snackbar та деяких дій
+    val localCoroutineScope = rememberCoroutineScope()
     val clipboardManager = LocalClipboardManager.current
 
     val autoTranslation by viewModel.autoTranslatedText.collectAsState()
@@ -70,9 +58,7 @@ fun ViewArticleScreen(
         mutableStateOf(TextFieldValue(text = articleState?.content ?: ""))
     }
 
-    // --- Ефекти ---
-
-    LaunchedEffect(articleState?.content) { // Оновлення TextFieldValue, якщо контент статті змінився
+    LaunchedEffect(articleState?.content) {
         if (articleContentTfv.text != (articleState?.content ?: "")) {
             val currentSelection = articleContentTfv.selection
             val newText = articleState?.content ?: ""
@@ -92,7 +78,7 @@ fun ViewArticleScreen(
 
     BackHandler {
         Log.d("ViewArticleScreen", "BackHandler triggered")
-        viewModel.clearAutomaticTranslation() // Очищаємо авто-переклад при виході
+        viewModel.clearAutomaticTranslation()
         onBack()
     }
 
@@ -106,7 +92,6 @@ fun ViewArticleScreen(
         }
     }
 
-    // Ключовий LaunchedEffect для обробки змін виділення тексту
     LaunchedEffect(articleContentTfv.selection) {
         val selection = articleContentTfv.selection
         val currentSelectedString = if (!selection.collapsed) {
@@ -117,17 +102,16 @@ fun ViewArticleScreen(
             } else { null }
         } else { null }
 
-        selectedTextContent = currentSelectedString // Оновлюємо стан виділеного тексту
+        selectedTextContent = currentSelectedString
 
         if (!currentSelectedString.isNullOrBlank() && currentArticle != null) {
             viewModel.requestAutomaticTranslation(currentSelectedString, currentArticle.languageCode)
         } else {
-            viewModel.clearAutomaticTranslation() // Очищаємо, якщо нічого не виділено
+            viewModel.clearAutomaticTranslation()
         }
         showCustomActions = !selectedTextContent.isNullOrEmpty()
     }
 
-    // --- UI ---
     Scaffold(
         topBar = {
             TopAppBar(
@@ -152,11 +136,10 @@ fun ViewArticleScreen(
             if (isLoadingInitialLoad && currentArticle == null) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (currentArticle != null) {
-                val article = currentArticle!! // Тепер впевнені, що стаття завантажена
+                val article = currentArticle!!
                 val scrollState = rememberScrollState()
 
-                // Позначка про прочитання при доскролюванні до кінця
-                LaunchedEffect(scrollState, article.content) { // Використовуємо article.content для перезапуску, якщо контент зміниться
+                LaunchedEffect(scrollState, article.content) {
                     snapshotFlow { scrollState.value > 0 && scrollState.value >= scrollState.maxValue - 20 }
                         .distinctUntilChanged()
                         .collect { isAtEnd ->
@@ -166,7 +149,7 @@ fun ViewArticleScreen(
                         }
                 }
 
-                Column( // Основний контент статті
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -181,12 +164,11 @@ fun ViewArticleScreen(
                         value = articleContentTfv,
                         onValueChange = { newValueTfv ->
                             articleContentTfv = newValueTfv
-                            // Логіка оновлення selectedTextContent та запуску авто-перекладу тепер у LaunchedEffect(articleContentTfv.selection)
                         },
                         modifier = Modifier.fillMaxWidth(),
                         readOnly = true,
                         colors = TextFieldDefaults.colors(
-                            disabledTextColor = LocalContentColor.current, // Щоб текст був видимий
+                            disabledTextColor = LocalContentColor.current,
                             focusedContainerColor = Color.Transparent,
                             unfocusedContainerColor = Color.Transparent,
                             disabledContainerColor = Color.Transparent,
@@ -196,28 +178,25 @@ fun ViewArticleScreen(
                             cursorColor = MaterialTheme.colorScheme.onPrimary
                         ),
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
-                            textAlign = TextAlign.Start // Вирівнювання тексту
+                            textAlign = TextAlign.Start
                         )
                     )
-                    Spacer(modifier = Modifier.height(120.dp)) // Збільшений відступ знизу для FloatingAppBar та можливого тексту перекладу
+                    Spacer(modifier = Modifier.height(120.dp))
                 }
 
-                // Відображення FloatingAppBar та автоматичного перекладу
                 if (showCustomActions && selectedTextContent != null) {
                     Column(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(bottom = 24.dp) // Відступ знизу для всієї групи елементів
-                            .padding(horizontal = 16.dp), // Горизонтальні відступи, щоб не прилипало до країв
+                            .padding(bottom = 24.dp)
+                            .padding(horizontal = 16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Відображення автоматичного перекладу (якщо є і не помилка)
                         val currentAutoTranslation = autoTranslation
                         val currentIsLoadingAutoTranslation = isLoadingAutoTranslation
 
                         if (currentIsLoadingAutoTranslation && selectedTextContent!!.length <= 300 ) {
-                            // Можна не показувати індикатор тут, він є в FloatingAppBar
                         } else if (!currentAutoTranslation.isNullOrBlank()) {
                             if (currentAutoTranslation == "[Виділений текст занадто довгий для авто-перекладу]") {
                                 Surface(shape = MaterialTheme.shapes.small, tonalElevation = 1.dp, color = MaterialTheme.colorScheme.errorContainer) {
@@ -257,11 +236,7 @@ fun ViewArticleScreen(
 
                                 sentenceRange?.let { range ->
                                     val sentenceText = articleText.substring(range.start, range.end)
-                                    // Можна додати перевірку на MAX_SENTENCE_LENGTH тут, якщо потрібно
-                                    // val MAX_SENTENCE_SELECT_LENGTH = 700
-                                    // if (sentenceText.length > MAX_SENTENCE_SELECT_LENGTH) { ... }
                                     articleContentTfv = articleContentTfv.copy(selection = range)
-                                    // `LaunchedEffect(articleContentTfv.selection)` оновить `selectedTextContent` та запустить авто-переклад
                                 } ?: localCoroutineScope.launch {
                                     snackbarHostState.showSnackbar("Не вдалося визначити речення.", duration = SnackbarDuration.Short)
                                 }

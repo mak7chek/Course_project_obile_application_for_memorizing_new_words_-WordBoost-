@@ -43,6 +43,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.ViewModel
 import com.example.wordboost.ui.screens.articles.ArticlesListScreen
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.activity.compose.BackHandler
+
 @Composable
 fun SectionHeader(
     title: String,
@@ -270,6 +274,21 @@ fun AuthenticatedAppScaffold(
     onNavigateToEditArticle: (articleId: String) -> Unit
 ) {
     val navController: NavHostController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    if (currentRoute == BottomNavItem.Sets.route) {
+        BackHandler {
+            Log.d("BackHandler", "Back pressed on Sets tab, navigating to Articles.")
+            navController.navigate(BottomNavItem.Articles.route) {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    this.saveState = true // Використовуй 'this.saveState'
+                }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
 
     Scaffold(
         bottomBar = { MyBottomNavigationBar(navController = navController) }
@@ -300,13 +319,13 @@ fun AuthenticatedAppScaffold(
                 )
             }
             composable(BottomNavItem.Articles.route) {
-                    val articleViewModel: ArticleViewModel = viewModel(factory = articleViewModelFactory)
-                    ArticlesListScreen(
-                        viewModel = articleViewModel,
-                        onViewArticle = onNavigateToViewArticle,
-                        onCreateArticle = onNavigateToCreateArticle,
-                        onEditArticle = onNavigateToEditArticle
-                    )
+                val articleViewModel: ArticleViewModel = viewModel(factory = articleViewModelFactory)
+                ArticlesListScreen(
+                    viewModel = articleViewModel,
+                    onViewArticle = onNavigateToViewArticle,
+                    onCreateArticle = onNavigateToCreateArticle,
+                    onEditArticle = onNavigateToEditArticle
+                )
             }
         }
     }

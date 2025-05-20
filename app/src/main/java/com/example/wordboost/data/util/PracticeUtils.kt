@@ -51,23 +51,35 @@ object PracticeUtils {
     }
 
     fun determineStatus(repetition: Int, interval: Long): String = when {
-        repetition == 0 && interval <= ONE_MINUTE_MS -> "learning"
+        repetition == 0 && interval <= ONE_MINUTE_MS -> "new"
         repetition > 0 && interval <= SIX_MINUTES_MS -> "learning"
         repetition > 0 && interval > SIX_MINUTES_MS && interval <= TimeUnit.DAYS.toMillis(21) -> "review"
         repetition > 0 && interval > TimeUnit.DAYS.toMillis(21) -> "mastered"
         else -> "new"
     }
 
+
+    fun isWordConsideredLearned(status: String): Boolean {
+        return status == "mastered" || status == "review"
+    }
+
     fun calculateProgress(repetition: Int, interval: Long): Float {
-        val progress: Float = when {
-            repetition == 0 && interval <= ONE_MINUTE_MS -> 0.1f
-            repetition == 1 && interval <= ONE_MINUTE_MS -> 0.2f
-            repetition == 2 && interval <= SIX_MINUTES_MS -> 0.4f
-            repetition > 2 && interval <= ONE_DAY_MS -> 0.6f
-            repetition > 2 && interval > ONE_DAY_MS && interval <= TimeUnit.DAYS.toMillis(7) -> 0.7f
-            repetition > 2 && interval > TimeUnit.DAYS.toMillis(7) && interval <= TimeUnit.DAYS.toMillis(30) -> 0.85f
-            else -> 1.0f
+        val currentStatus = determineStatus(repetition, interval)
+        val progress: Float = when (currentStatus) {
+            "mastered" -> 1.0f
+            "review" -> {
+                if (interval <= ONE_DAY_MS * 2) 0.7f
+                else if (interval <= TimeUnit.DAYS.toMillis(7)) 0.85f
+                else 0.95f
+            }
+            "learning" -> {
+                if (repetition == 1 && interval <= ONE_MINUTE_MS) 0.2f
+                else if (repetition == 2 && interval <= SIX_MINUTES_MS) 0.4f
+                else 0.6f
+            }
+            "new" -> if (repetition == 0 && interval <= ONE_MINUTE_MS) 0.1f else 0.05f
+            else -> 0.05f
         }
-        return minOf(progress, 1.0f)
+        return kotlin.math.min(progress, 1.0f)
     }
 }

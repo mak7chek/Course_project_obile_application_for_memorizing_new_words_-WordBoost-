@@ -67,41 +67,37 @@ fun CreateEditArticleScreen(
             content = articleToEdit!!.content
             published = articleToEdit!!.published
             isLoadingData = false
-            initialDataLoaded = true // Дані завантажені та встановлені
+            initialDataLoaded = true
             Log.d("CreateEditArticle", "Article data populated: ${articleToEdit!!.title}")
         } else if (!isEditing && !initialDataLoaded) {
-            // Для режиму створення, якщо LaunchedEffect(editingArticleId) вже скинув поля
             isLoadingData = false
             initialDataLoaded = true
         }
     }
 
-    // Обробка статусу збереження
     LaunchedEffect(saveStatus) {
         when (saveStatus) {
             SaveArticleStatus.Success -> {
                 Log.d("CreateEditArticle", "Save successful, calling onSaveSuccess callback.")
                 snackbarHostState.showSnackbar("Статтю збережено!", duration = SnackbarDuration.Short)
-                onSaveSuccess() // Навігація назад
-                viewModel.resetSaveArticleStatus() // Скидаємо статус у ViewModel
+                onSaveSuccess()
+                viewModel.resetSaveArticleStatus()
             }
             SaveArticleStatus.Error -> {
                 Log.d("CreateEditArticle", "Save error occurred.")
-                // errorMessage вже буде показаний іншим LaunchedEffect
-                viewModel.resetSaveArticleStatus() // Скидаємо статус
+                viewModel.resetSaveArticleStatus()
             }
-            else -> { /* Idle or Saving, isSaving керує станом кнопки */ }
+            else -> { }
         }
     }
 
-    // Показ Snackbar при помилці (загальній, не тільки від збереження)
     LaunchedEffect(errorMessage) {
         errorMessage?.let {
-            if (saveStatus != SaveArticleStatus.Error) { // Якщо помилка не від save, показуємо її
+            if (saveStatus != SaveArticleStatus.Error) {
                 Log.d("CreateEditArticle", "Showing error snackbar: $it")
                 snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Long)
             }
-            viewModel.clearErrorMessage() // Завжди очищаємо після показу або обробки
+            viewModel.clearErrorMessage()
         }
     }
 
@@ -111,7 +107,7 @@ fun CreateEditArticleScreen(
                 title = { Text(screenTitle) },
                 navigationIcon = {
                     IconButton(onClick = {
-                        if (!isSaving) onBack() // Дозволяємо назад, якщо не зберігаємо
+                        if (!isSaving) onBack()
                     }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
@@ -122,7 +118,7 @@ fun CreateEditArticleScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {
-                    if (!isSaving) { // Додаткова перевірка, хоча isSaving тепер з ViewModel
+                    if (!isSaving) {
                         Log.d("CreateEditArticle", "Save button clicked. Title: $title, Published: $published")
                         viewModel.createOrUpdateArticle(
                             id = editingArticleId,
@@ -141,7 +137,7 @@ fun CreateEditArticleScreen(
                 },
                 text = { Text(if (isSaving) "Збереження..." else if (published && !isEditing) "Опублікувати" else "Зберегти") },
                 expanded = true,
-                modifier = Modifier.padding(bottom = 16.dp, start = 16.dp, end = 16.dp) // Відступи для FAB
+                modifier = Modifier.padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
             )
         },
         floatingActionButtonPosition = FabPosition.Center
@@ -155,7 +151,7 @@ fun CreateEditArticleScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(horizontal = 16.dp, vertical = 8.dp) // Додав вертикальний padding
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -164,11 +160,11 @@ fun CreateEditArticleScreen(
                     onValueChange = { title = it },
                     label = { Text("Заголовок статті") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true, // Можна зробити багаторядковим, якщо заголовки довгі
+                    singleLine = true,
                     enabled = !isSaving,
-                    isError = title.isBlank() && !isLoadingData // Проста валідація на порожній заголовок
+                    isError = title.isBlank() && !isLoadingData
                 )
-                if (title.isBlank() && !isLoadingData && !isSaving) { // Показувати помилку тільки якщо поле вже було активне
+                if (title.isBlank() && !isLoadingData && !isSaving) {
                     Text("Заголовок не може бути порожнім", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
 

@@ -160,11 +160,33 @@ fun PracticeScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Text("Практична сесія завершена!", style = MaterialTheme.typography.headlineMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Ви повторили ${phase.totalPracticedCount} слів.")
+                    Text("Практичну сесію завершено!", style = MaterialTheme.typography.headlineMedium)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = onBack) {
+
+                    Text("Загалом слів опрацьовано: ${phase.totalPracticedCount}", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Правильні відповіді: ${phase.correctAnswers}", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Неправильні відповіді: ${phase.incorrectAnswers}", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val answeredCount = phase.correctAnswers + phase.incorrectAnswers
+                    val accuracy = if (answeredCount > 0) {
+                        (phase.correctAnswers.toDouble() / answeredCount.toDouble() * 100)
+                    } else {
+                        0.0
+                    }
+                    Text("Точність відповідей: ${String.format(java.util.Locale.US, "%.1f", accuracy)}%", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text("Слів перейшло у вивчені/повторення: ${phase.newlyLearnedCount}", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Button(onClick = { viewModel.startOrRefreshSession() }) {
+                        Text("Почати нову сесію")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(onClick = onBack) {
                         Text("Повернутись до головного")
                     }
                 }

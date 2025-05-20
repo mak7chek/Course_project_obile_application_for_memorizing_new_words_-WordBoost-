@@ -60,11 +60,11 @@ fun MainScreen(
     var editingWordIdForFullScreen by remember { mutableStateOf<String?>(null) }
     var currentSetIdForBrowse by remember { mutableStateOf<String?>(null) }
     var editingSetId by remember { mutableStateOf<String?>(null) }
-
     var viewingArticleId by remember { mutableStateOf<String?>(null) }
     var editingArticleId by remember { mutableStateOf<String?>(null) }
     var enTextForTranslateScreen by remember { mutableStateOf<String?>(null) }
     var ukTextForTranslateScreen by remember { mutableStateOf<String?>(null) }
+    var previousScreenBeforeTranslate by remember { mutableStateOf<TopLevelScreenState?>(null) }
 
     val practiceViewModelFactory = remember(practiceRepo, ttsService, authRepo) { PracticeViewModelFactory(repository = practiceRepo, ttsService = ttsService, authRepository = authRepo) }
     val wordListViewModelFactory = remember(firebaseRepo, authRepo, ttsService) { WordListViewModelFactory(repository = firebaseRepo, authRepository = authRepo, ttsService = ttsService) }
@@ -88,8 +88,16 @@ fun MainScreen(
                 ukTextForTranslateScreen = original
                 enTextForTranslateScreen = translated
             }
+            previousScreenBeforeTranslate = TopLevelScreenState.ViewArticleFullScreen
             currentTopLevelScreenState = TopLevelScreenState.TranslateWordFullScreen
         }
+
+    val navigateToGenericTranslateScreen: () -> Unit = {
+        enTextForTranslateScreen = null
+        ukTextForTranslateScreen = null
+        previousScreenBeforeTranslate = TopLevelScreenState.AuthenticatedApp
+        currentTopLevelScreenState = TopLevelScreenState.TranslateWordFullScreen
+    }
     LaunchedEffect(key1 = authRepo) {
         Log.d("MainScreen", "Auth state listener collection started.")
         authRepo.getAuthState().collect { user ->
@@ -146,7 +154,7 @@ fun MainScreen(
             TopLevelScreenState.AuthenticatedApp -> {
                 Log.i("MainScreen_Render", "Showing AuthenticatedAppScaffold UI")
                 AuthenticatedAppScaffold(
-                    onNavigateToTranslate = { currentTopLevelScreenState = TopLevelScreenState.TranslateWordFullScreen },
+                    onNavigateToTranslate = navigateToGenericTranslateScreen, // Оновлений колбек
                     onNavigateToPractice = { currentTopLevelScreenState = TopLevelScreenState.PracticeSessionFullScreen },
                     onNavigateToWordList = { currentTopLevelScreenState = TopLevelScreenState.WordListFullScreen },
 
@@ -213,26 +221,24 @@ fun MainScreen(
                     editingArticleId = editingArticleId,
                     viewModel = articleViewModel,
                     onSaveSuccess = {
-                        Log.d("MainScreen", "Save success for article, navigating back to AuthenticatedApp.")
-                        editingArticleId = null // Скидаємо ID після збереження
-                        currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp // <--- ЗМІНА ТУТ
+                        editingArticleId = null
+                        currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp // Повернення на екран зі списком статей (вкладку)
                     },
                     onBack = {
-                        Log.d("MainScreen", "Back from CreateEditArticle, navigating back to AuthenticatedApp.")
                         editingArticleId = null
-                        currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp // <--- ЗМІНА ТУТ
+                        currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp // Повернення на екран зі списком статей (вкладку)
                     }
                 )
             }
             TopLevelScreenState.TranslateWordFullScreen -> {
-                Log.d("MainScreen", "Showing TranslateWordFullScreen with EN: '$enTextForTranslateScreen', UK: '$ukTextForTranslateScreen'")
                 TranslateScreen(
                     firebaseRepo = firebaseRepo,
                     translationRepo = translationRepo,
                     initialEn = enTextForTranslateScreen,
                     initialUk = ukTextForTranslateScreen,
                     onBack = {
-                        currentTopLevelScreenState = TopLevelScreenState.AuthenticatedApp
+                        currentTopLevelScreenState = previousScreenBeforeTranslate ?: TopLevelScreenState.AuthenticatedApp
+                        previousScreenBeforeTranslate = null
                         enTextForTranslateScreen = null
                         ukTextForTranslateScreen = null
                     }
